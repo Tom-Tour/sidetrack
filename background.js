@@ -55,7 +55,6 @@ function save() {
 // --- Liaison avec la barre latérale ---------------------------------------
 
 const ports = new Set();
-let prepared = false; // onglet du lecteur préparé pour cette session
 let updateScheduled = null;
 
 function snapshot() {
@@ -82,12 +81,9 @@ browser.runtime.onConnect.addListener((port) => {
   if (port.name === "player") return connectPlayer(port);
   if (port.name !== "sidebar") return;
   ports.add(port);
-  // Première ouverture du panneau de la session : l'onglet du lecteur se prépare tout de suite
-  // (écran « Lancer Sidetrack » si Firefox exige un clic), avant même la première vidéo
-  if (!prepared) {
-    prepared = true;
-    warmPlayer();
-  }
+  // Panneau ouvert : l'onglet du lecteur doit exister. Il se prépare tout de suite (écran
+  // « Lancer Sidetrack » si Firefox exige un clic), avant même la première vidéo
+  warmPlayer();
   port.onDisconnect.addListener(() => ports.delete(port));
   port.onMessage.addListener(async ({ cmd, args = [] }) => {
     // Une erreur dans une commande serait sinon invisible : on la met au journal
@@ -369,8 +365,10 @@ function connectPlayer(port) {
     playerShown = false;
     log(t("logTabClosed"));
     update();
-    // Invité d'un salon : l'onglet est indispensable, on le rouvre et on reprend où en est l'hôte
+    // Invité d'un salon : l'onglet est indispensable, on le rouvre et on reprend où en est l'hôte.
+    // Sinon, panneau ouvert : on le rouvre aussi, sur l'écran du début
     if (inGuestRoom()) setTimeout(guestPlayerLost, 500);
+    else if (ports.size) setTimeout(warmPlayer, 500);
   });
   for (const cmd of queued) port.postMessage(cmd);
   queued = [];
