@@ -103,9 +103,9 @@ $("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti"
 
 // --- Multijoueur -------------------------------------------------------------
 
-// Un seul sous-formulaire ouvert à la fois : créer, rejoindre ou parcourir
+// Un seul panneau ouvert à la fois : créer, ou rejoindre (code et salons publics)
 let multiPanel = null;
-const PANELS = { create: "#create-form", join: "#join-form", browse: "#browse" };
+const PANELS = { create: "#create-form", join: "#join-panel" };
 
 function openPanel(name) {
   multiPanel = multiPanel === name ? null : name;
@@ -113,23 +113,19 @@ function openPanel(name) {
     $(sel).hidden = key !== multiPanel;
     $(`#multi-${key}`).classList.toggle("on", key === multiPanel);
   }
-  if (multiPanel === "join") $("#join-code").focus();
-  if (multiPanel === "browse") act("refreshPublicRooms");
+  if (multiPanel === "join") {
+    $("#join-code").focus();
+    act("refreshPublicRooms");
+  }
 }
 
 for (const name of Object.keys(PANELS)) {
   $(`#multi-${name}`).addEventListener("click", () => openPanel(name));
 }
 
-// Le nom du salon ne sert qu'à la liste publique : il n'apparaît qu'avec « Public »
-$("#room-public").addEventListener("change", (e) => {
-  $("#room-name").hidden = !e.target.checked;
-  if (e.target.checked) $("#room-name").focus();
-});
 $("#create-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const isPublic = $("#room-public").checked;
-  act("openRoom", { isPublic, name: isPublic ? $("#room-name").value : "" });
+  act("openRoom", { isPublic: $("#room-public").checked });
   openPanel(null);
 });
 $("#join-form").addEventListener("submit", (e) => {
@@ -237,8 +233,7 @@ function renderPublicRooms() {
   $("#public-list").replaceChildren(
     ...list.map((r) => {
       const li = el("li");
-      const name = li.appendChild(el("span", `${r.mode === "blind" ? "❓" : "🎵"} ${r.name}`, "name"));
-      name.title = `${r.name} (${r.code})`;
+      li.appendChild(el("span", `${r.mode === "blind" ? "❓" : "🎵"} ${t("room")} ${r.code}`, "name"));
       li.append(el("span", `${r.players} 👤`, "muted"), button(t("join"), () => act("joinRoom", r.code)));
       return li;
     })

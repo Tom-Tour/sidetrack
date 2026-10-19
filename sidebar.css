@@ -65,19 +65,19 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .chapters .row { gap: 6px; }
 .chapters time { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-#multi { margin-top: 6px; }
-#multi-bar { display: flex; align-items: center; gap: 4px; }
-.chip { flex: 1; padding: 2px 6px; border-radius: 12px; }
+#multi { margin-bottom: 8px; }
+#multi-bar { display: flex; gap: 4px; }
+#multi-bar button { flex: 1; }
 .sub { display: grid; gap: 4px; margin-top: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 4px; }
 .line { display: flex; align-items: center; gap: 4px; }
 .sub.line { display: flex; }
-#room-name, #join-code { flex: 1; min-width: 0; }
+#join-code { flex: 1; min-width: 0; }
 #join-code { text-transform: uppercase; letter-spacing: 1px; }
-#browse .line { justify-content: space-between; }
+#join-panel .line #public-status { flex: 1; }
 #public-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 #public-list li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; }
 #public-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#room-panel { margin-top: 4px; border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
+#room-panel { border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
 #room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #room-head strong { font-size: 15px; letter-spacing: 1px; }
 #room-close { margin-left: auto; }

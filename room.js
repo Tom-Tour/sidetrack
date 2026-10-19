@@ -14,7 +14,7 @@ const ROOM_PREFIX = "sidetrack-room-";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CHAT_LIMIT = 200;
 
-// { code, link, status, public, name, peer, players: Map(peerId → { id, name, score, conn }), chat: [] }
+// { code, link, status, public, peer, players: Map(peerId → { id, name, score, conn }), chat: [] }
 let room = null;
 let chatSeq = 0;
 let lastPublic = "";
@@ -24,7 +24,7 @@ function makeCode() {
   return Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 }
 
-function openRoom({ isPublic = false, name = "" } = {}) {
+function openRoom({ isPublic = false } = {}) {
   if (room) return;
   log(
     t(
@@ -40,7 +40,6 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     link: `${JOIN_URL}#${code}`,
     status: "opening",
     public: isPublic,
-    name: String(name).trim().slice(0, 40) || "Sidetrack",
     peer,
     players: new Map(),
     chat: [],
@@ -61,10 +60,10 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     if (room?.peer !== peer) return;
     if (e.type === "unavailable-id") {
       // Code déjà pris : on en tire un autre
-      const { public: isPublic, name } = room;
+      const { public: isPublic } = room;
       peer.destroy();
       room = null;
-      return openRoom({ isPublic, name });
+      return openRoom({ isPublic });
     }
     log(t("logRoomError", e.type));
     if (["network", "server-error", "socket-error", "browser-incompatible"].includes(e.type)) {
@@ -264,7 +263,6 @@ function roomSnapshot() {
     link: room.link,
     status: room.status,
     public: room.public,
-    name: room.name,
     players: [...room.players.values()].map(({ id, name, score }) => ({ id, name, score })),
     chat: room.chat,
   };
@@ -306,7 +304,7 @@ function publishAnnouncement(content, ttl) {
 }
 
 function announcement() {
-  return { code: room.code, name: room.name, players: room.players.size, mode: state.mode };
+  return { code: room.code, players: room.players.size, mode: state.mode };
 }
 
 function announce() {
@@ -364,7 +362,6 @@ async function refreshPublicRooms() {
       if (c.code === room?.code) continue; // notre propre salon
       list.push({
         code: c.code,
-        name: String(c.name ?? "").slice(0, 40) || "Salon",
         players: Math.max(0, Number(c.players) || 0),
         mode: c.mode === "blind" ? "blind" : "listen",
         at: e.created_at,
