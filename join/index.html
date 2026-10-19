@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sidetrack</title>
   <!-- Versions à incrémenter à chaque modification (cache de GitHub Pages) -->
-  <link rel="stylesheet" href="join.css?v=3">
+  <link rel="stylesheet" href="join.css?v=4">
 </head>
 <body>
   <nav id="langs"><button data-lang="fr">FR</button> · <button data-lang="en">EN</button></nav>
@@ -19,6 +19,7 @@
       <button type="submit" data-i18n="joinButton"></button>
     </form>
     <p id="login-error" class="error" hidden></p>
+    <p class="muted small" data-i18n="ipNotice"></p>
   </main>
 
   <main id="room" hidden>
@@ -53,12 +54,14 @@
           <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
           <button type="submit" data-i18n="send"></button>
         </form>
+        <p id="chat-note" class="muted small" hidden></p>
       </aside>
     </div>
   </main>
 
   <script src="../vendor/peerjs.min.js"></script>
-  <script src="join.js?v=3"></script>
+  <script src="../vendor/nostr.bundle.js"></script>
+  <script src="join.js?v=4"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

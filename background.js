@@ -23,6 +23,8 @@ let state = {
   volume: 100,
   lang: "auto",        // "auto" | "fr" | "en"
   showMulti: true,     // bouton 🌐 du salon (désactivable dans les réglages pour un usage solo)
+  chatSound: false,    // petit son à chaque nouveau message du salon
+  banned: {},          // identité (clé publique) → dernier nom connu : refusés dans nos salons
 };
 
 let playerState = -1;  // -1 non démarré, 0 fini, 1 lecture, 2 pause, 5 prête
@@ -623,6 +625,13 @@ const actions = {
   joinRoom: (code) => joinRoom(code),
   hostChat: (text) => hostChat(text),
   award: (playerId, delta) => award(playerId, delta),
+  kick: (playerId) => kick(playerId, false),
+  ban: (playerId) => kick(playerId, true),
+  unban: (playerId) => {
+    delete state.banned[playerId];
+    update();
+    save();
+  },
   next,
   prev,
   toggle,
@@ -653,7 +662,7 @@ const actions = {
     save();
   },
   setSetting: (key, value) => {
-    if (!["lang", "showMulti"].includes(key)) return;
+    if (!["lang", "showMulti", "chatSound"].includes(key)) return;
     state[key] = value;
     if (key === "lang") setLang(value);
     update();
@@ -677,6 +686,7 @@ browser.storage.local.get("sidetrack").then((s) => {
     }
     state = { ...state, ...s.sidetrack, blind };
   }
+  if (!state.banned || typeof state.banned !== "object") state.banned = {};
   setLang(state.lang);
   if (!state.playlists.length) newPlaylist(t("defaultPlaylist"));
   if (!playlist()) state.current = state.playlists[0].id;

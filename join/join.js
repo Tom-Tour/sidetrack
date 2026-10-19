@@ -45,6 +45,16 @@ const STRINGS = {
     chatLeft: "{0} est parti",
     chatPointPlus: "+{0} point pour {1} ({2})",
     chatPointMinus: "{0} point pour {1} ({2})",
+    chatFlood: "{0} envoie trop de messages : sourdine pendant 1 minute",
+    chatKicked: "{0} a été exclu du salon",
+    chatBanned: "{0} a été banni",
+    preparing: "Préparation de ton identité anti-spam (une seule fois, environ 30 s)… {0} essais",
+    full: "Ce salon est complet (24 joueurs).",
+    kicked: "L'hôte t'a exclu du salon.",
+    banned: "L'hôte t'a banni de ses salons.",
+    muted: "Trop de messages : tu es en sourdine pendant 1 minute.",
+    tooFast: "Doucement : 2 messages par seconde au plus.",
+    ipNotice: "Connexion directe avec l'hôte (pair-à-pair) : il voit ton adresse IP, comme dans tout échange de ce type.",
   },
   en: {
     intro: "Join the room to listen or play blind test together.",
@@ -85,6 +95,16 @@ const STRINGS = {
     chatLeft: "{0} left",
     chatPointPlus: "+{0} point for {1} ({2})",
     chatPointMinus: "{0} point for {1} ({2})",
+    chatFlood: "{0} is sending too many messages: muted for 1 minute",
+    chatKicked: "{0} was kicked from the room",
+    chatBanned: "{0} was banned",
+    preparing: "Preparing your anti-spam identity (only once, about 30 s)… {0} tries",
+    full: "This room is full (24 players).",
+    kicked: "The host kicked you from the room.",
+    banned: "The host banned you from their rooms.",
+    muted: "Too many messages: you're muted for 1 minute.",
+    tooFast: "Slow down: 2 messages per second at most.",
+    ipNotice: "Direct connection with the host (peer-to-peer): they can see your IP address, as in any such exchange.",
   },
 };
 
@@ -129,12 +149,84 @@ let room = null;       // dernier état envoyé par l'hôte
 let lastSync = null;   // { id, time, playing } : position de l'hôte
 let latency = 0;       // demi-aller-retour vers l'hôte, en secondes
 let joined = false;
+let ended = false;     // l'hôte a mis fin à notre présence (et dit pourquoi)
 let apiReady = false;
 let player = null;
 let playerReady = false;
 const chat = [];       // messages dans l'ordre d'arrivée
 const mySecrets = [];  // mes propositions masquées, pour les afficher chez moi
 const expanded = new Set();
+
+// --- Identité --------------------------------------------------------------------
+// Une clé Nostr gardée dans ce navigateur : elle signe le défi de l'hôte à chaque connexion,
+// si bien que personne ne peut se faire passer pour toi, et que l'hôte peut exclure ou
+// bannir une identité. Dans un salon public, elle doit être accompagnée d'une preuve de
+// travail (pow-worker.js), calculée une seule fois puis gardée.
+
+const HELLO_KIND = 27235;
+const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+const unhex = (s) => Uint8Array.from(s.match(/../g).map((h) => parseInt(h, 16)));
+
+function store(key, value) {
+  try {
+    if (value === undefined) return JSON.parse(localStorage.getItem(key) ?? "null");
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    return null; // stockage indisponible (navigation privée stricte…) : identité le temps de la page
+  }
+}
+
+let secret = store("sidetrack-identity");
+if (typeof secret !== "string" || !/^[0-9a-f]{64}$/.test(secret)) {
+  secret = hex(NostrTools.generateSecretKey());
+  store("sidetrack-identity", secret);
+}
+const identity = { secret: unhex(secret), pubkey: NostrTools.getPublicKey(unhex(secret)) };
+
+// Preuve de travail d'au moins `bits` bits pour notre identité (cherchée une seule fois)
+function proofOfWork(bits) {
+  const saved = store("sidetrack-pow");
+  if (saved?.pubkey === identity.pubkey && saved.bits >= bits && Number.isSafeInteger(saved.nonce)) {
+    return Promise.resolve(saved.nonce);
+  }
+  return new Promise((resolve) => {
+    const worker = new Worker("../pow-worker.js");
+    worker.onmessage = ({ data }) => {
+      if (data.t === "progress") return loginStatus(t("preparing", data.tries));
+      worker.terminate();
+      store("sidetrack-pow", { pubkey: identity.pubkey, bits, nonce: data.nonce });
+      resolve(data.nonce);
+    };
+    loginStatus(t("preparing", 0));
+    worker.postMessage({ t: "mine", pubkey: identity.pubkey, bits });
+  });
+}
+
+// Réponse au défi : signée par notre identité, pour ce salon et ce défi précis
+async function answerChallenge(msg, name) {
+  const pow = Math.max(0, Math.floor(Number(msg.pow) || 0));
+  const nonce = pow ? await proofOfWork(pow) : 0;
+  const ev = NostrTools.finalizeEvent(
+    {
+      kind: HELLO_KIND,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [["room", String(msg.room)], ["challenge", String(msg.c)], ["pow", String(nonce)]],
+      content: "",
+    },
+    identity.secret
+  );
+  send({ t: "hello", name, ev });
+}
+
+// Compteur glissant : la page n'envoie jamais plus que ce que l'hôte accepte
+const sendTimes = [];
+function rateOk(times, limit) {
+  const now = Date.now();
+  while (times.length && now - times[0] >= 1000) times.shift();
+  if (times.length >= limit) return false;
+  times.push(now);
+  return true;
+}
 
 // --- Connexion ---------------------------------------------------------------
 
@@ -167,6 +259,11 @@ $("#login-form").addEventListener("submit", (e) => {
   join(code, name);
 });
 
+// Progression affichée pendant la connexion (preuve de travail)
+function loginStatus(text) {
+  $("#login-form button").textContent = text;
+}
+
 // text : message d'erreur, ou null pendant la connexion
 function loginError(text) {
   $("#login-error").textContent = text;
@@ -182,9 +279,10 @@ function join(code, name) {
   peer = new Peer();
   peer.on("open", () => {
     conn = peer.connect(ROOM_PREFIX + code, { reliable: true, serialization: "json" });
-    conn.on("open", () => conn.send({ t: "hello", name }));
-    conn.on("data", onData);
-    conn.on("close", () => setStatus(t("disconnected")));
+    // L'hôte commence par un défi : on y répond (voir onData)
+    conn.on("data", (msg) => (msg?.t === "challenge" ? answerChallenge(msg, name) : onData(msg)));
+    // Fermeture qui suit un message de l'hôte (salon fermé, exclusion…) : on garde ce message
+    conn.on("close", () => ended || setStatus(t("disconnected")));
   });
   peer.on("error", (e) => {
     const text = e.type === "peer-unavailable" ? t("notFound") : t("cantConnect", e.type);
@@ -207,7 +305,7 @@ function onData(msg) {
   switch (msg?.t) {
     case "welcome":
       joined = true;
-      me = peer.id;
+      me = msg.you;
       $("#login").hidden = true;
       $("#room").hidden = false;
       $("#room-code").textContent = msg.code;
@@ -224,6 +322,7 @@ function onData(msg) {
       break;
     case "chat":
       if (msg.msg.masked && msg.msg.from === me) msg.msg.mine = mySecrets.shift();
+      if (document.hidden && !msg.msg.system && msg.msg.from !== me) document.title = `(${++unseen}) Sidetrack`;
       chat.push(msg.msg);
       if (chat.length > 300) chat.shift();
       renderChat();
@@ -241,10 +340,19 @@ function onData(msg) {
     case "pong":
       latency = (performance.now() - msg.at) / 2000;
       break;
+    // Fin du salon, refus ou sanction de l'hôte
     case "closed":
-      setStatus(t("closed"));
+    case "full":
+    case "kicked":
+    case "banned":
+      ended = true;
+      if (!joined) return loginError(t(msg.t));
+      setStatus(t(msg.t));
       $("#chat-input").disabled = true;
       player?.pauseVideo?.();
+      break;
+    case "muted":
+      flash(t("muted"));
       break;
   }
 }
@@ -295,13 +403,24 @@ $("#volume").addEventListener("input", (e) => {
 // --- Chat --------------------------------------------------------------------
 
 function sendRef(ref, text = "") {
+  if (!rateOk(sendTimes, 2)) return flash(t("tooFast"));
   send({ t: "chat", text, ref });
+}
+
+// Message bref sous le chat (débit, sourdine)
+let flashTimer = null;
+function flash(text) {
+  $("#chat-note").textContent = text;
+  $("#chat-note").hidden = false;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => ($("#chat-note").hidden = true), 4000);
 }
 
 $("#chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("#chat-input").value.trim();
   if (!text) return;
+  if (!rateOk(sendTimes, 2)) return flash(t("tooFast"));
   // En blind test, l'hôte masque la proposition pour les autres : on la garde pour soi
   if (room?.blind && ["playing", "timeup"].includes(room.blind.phase)) mySecrets.push(text);
   send({ t: "chat", text });
@@ -328,6 +447,14 @@ function formatTime(s) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
+// Messages arrivés pendant que l'onglet était en arrière-plan : comptés dans le titre
+let unseen = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  unseen = 0;
+  document.title = "Sidetrack";
+});
+
 function renderChat() {
   const box = $("#chat");
   const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
@@ -339,7 +466,9 @@ function renderChat() {
         return msg.mine ? el("p", t("yourGuess", msg.mine), "masked") : el("p", t("someoneGuessed", msg.name), "masked");
       }
       const p = el("p");
-      p.append(el("b", `${msg.from === "host" ? t("host") : msg.name} : `), msg.text ?? "");
+      const who = p.appendChild(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
+      if (msg.color) who.style.color = msg.color;
+      p.append(msg.text ?? "");
       if (msg.ref) {
         p.append(el("span", `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, "ref"));
       }
@@ -389,6 +518,7 @@ function render() {
   $("#players").replaceChildren(
     ...room.players.map((p) => {
       const li = el("li", p.name, p.id === me ? "me" : "");
+      li.style.color = p.color;
       if (room.blind) li.append(el("b", String(p.score)));
       return li;
     })

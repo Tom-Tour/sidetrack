@@ -24,6 +24,8 @@ button { cursor: pointer; }
 button:hover { border-color: var(--accent); }
 .muted { color: var(--muted); }
 .error { color: var(--bad); }
+.small { font-size: 13px; }
+#chat-note { margin: 0; }
 
 #langs { position: absolute; top: 8px; right: 16px; color: var(--muted); }
 #langs button { border: 0; background: none; padding: 2px 4px; color: var(--muted); }

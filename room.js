@@ -5,6 +5,16 @@
 // L'hôte choisit les vidéos et arbitre : en blind test, les propositions tapées dans le
 // chat ne sont visibles que de lui pendant la manche, et c'est lui qui donne les points.
 //
+// Sécurité (mêmes principes que Pagemates) :
+// - chaque invité a une identité (clé Nostr gardée dans son navigateur) et signe le défi
+//   aléatoire envoyé par l'hôte : impossible de se faire passer pour un autre ou de rejouer
+//   une connexion ; exclure ou bannir vise cette identité ;
+// - dans un salon public, une identité coûte une preuve de travail (pow-worker.js, environ
+//   30 s une seule fois) : un banni ne revient pas avec des milliers de nouvelles identités ;
+// - débit fixe et identique pour tous : au-delà, les messages sont ignorés, et qui insiste
+//   est mis en sourdine une minute ; tout ce qui arrive des invités est nettoyé ;
+// - 24 joueurs au plus.
+//
 // Un salon public est en plus annoncé sur des relais Nostr publics (nostr-tools), d'où
 // la liste des salons disponibles. Annonces signées avec une clé jetable par salon,
 // renouvelées chaque minute et expirant d'elles-mêmes.
@@ -13,12 +23,32 @@ const JOIN_URL = "https://tom-tour.github.io/sidetrack/join/";
 const ROOM_PREFIX = "sidetrack-room-";
 const CODE_CHARS = "abcdefghjkmnpqrstuvwxyz23456789";
 const CHAT_LIMIT = 200;
+const TEXT_MAX = 300;
+const MAX_PLAYERS = 24;
+const HELLO_KIND = 27235; // éphémère : jamais publié, sert seulement à signer la poignée de main
+const POW_BITS = 8;       // bits à zéro exigés dans un salon public : ~256 essais de scrypt
+// Temps laissé à un invité pour se présenter (la preuve de travail peut prendre ~30 s)
+const HELLO_TIMEOUT_PUBLIC = 120 * 1000;
+const HELLO_TIMEOUT_PRIVATE = 20 * 1000;
 
-// { code, link, status, public, peer, players: Map(peerId → { id, name, score, conn }), chat: [] }
+// Anti-flood : la réception tolère un peu plus que ce que la page invité envoie au plus,
+// si bien qu'un invité normal n'est jamais filtré.
+const HOST_SEND_PER_SECOND = 2;
+const RECV_PER_SECOND = 3; // messages de chat acceptés, par joueur
+const META_PER_SECOND = 4; // autres messages (ping…)
+const FLOOD_DROPS = 30;    // messages ignorés en 10 s avant la sourdine
+const FLOOD_MUTE = 60 * 1000;
+
+// Couleurs des joueurs, lisibles sur fond clair comme sombre
+const PALETTE = ["#e5484d", "#f76b15", "#d5a000", "#30a46c", "#12a594", "#0090ff", "#6e56cf", "#d6409f", "#8e4ec6", "#ab6400"];
+
+// { code, link, status, public, peer, players: Map(pubkey → joueur), pending: Map(conn → {…}),
+//   kicked: Set(pubkey), chat: [] }
 let room = null;
 let chatSeq = 0;
 let lastPublic = "";
 let lastSync = null;
+const hostTimes = [];
 
 function makeCode() {
   return Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
@@ -28,7 +58,7 @@ function makeCode() {
 function roomName(text) {
   return String(text ?? "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "-")
@@ -36,6 +66,25 @@ function roomName(text) {
     .slice(0, 24);
 }
 const ROOM_NAME = /^[a-z0-9_-]{3,24}$/;
+
+// Compteur glissant sur une seconde
+function rateOk(times, limit, now = Date.now()) {
+  while (times.length && now - times[0] >= 1000) times.shift();
+  if (times.length >= limit) return false;
+  times.push(now);
+  return true;
+}
+
+function safeSend(conn, msg) {
+  try {
+    if (conn?.open) conn.send(msg);
+  } catch {
+    // connexion en train de tomber : le « close » suivra
+  }
+}
+
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 function openRoom({ isPublic = false, name = "" } = {}) {
   if (room) return;
@@ -60,6 +109,8 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     public: isPublic,
     peer,
     players: new Map(),
+    pending: new Map(),
+    kicked: new Set(),
     chat: [],
   };
   lastPublic = "";
@@ -70,7 +121,7 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     if (room.public) startAnnouncing();
     update();
   });
-  peer.on("connection", acceptPlayer);
+  peer.on("connection", acceptConnection);
   peer.on("disconnected", () => {
     if (room?.peer === peer) peer.reconnect();
   });
@@ -116,56 +167,285 @@ function closeRoom() {
 function broadcast(msg, except = null) {
   if (!room) return;
   for (const p of room.players.values()) {
-    if (p.id !== except && p.conn.open) p.conn.send(msg);
+    if (p.id !== except) safeSend(p.conn, msg);
   }
 }
 
-// --- Invités ---------------------------------------------------------------
+// --- Preuve de travail ---------------------------------------------------------
 
-function acceptPlayer(conn) {
-  conn.on("data", (msg) => onPlayerData(conn, msg));
-  conn.on("close", () => {
-    const p = room?.players.get(conn.peer);
-    if (!p) return;
-    room.players.delete(conn.peer);
-    systemMessage("chatLeft", p.name);
-  });
+let powVerifier = null;
+let powSeq = 0;
+const powWaiting = new Map();
+const powOk = new Map(); // pubkey → nonce déjà vérifié
+
+// Nombre de bits à zéro de la preuve d'une identité (calcul dans un worker)
+function powBits(pubkey, nonce) {
+  if (powOk.get(pubkey) === nonce) return Promise.resolve(POW_BITS);
+  if (!powVerifier) {
+    powVerifier = new Worker("pow-worker.js");
+    powVerifier.onmessage = ({ data }) => {
+      powWaiting.get(data.req)?.(data.bits);
+      powWaiting.delete(data.req);
+    };
+  }
+  const req = ++powSeq;
+  powVerifier.postMessage({ t: "verify", req, pubkey, nonce });
+  return new Promise((resolve) => powWaiting.set(req, resolve));
 }
 
-function onPlayerData(conn, msg) {
-  if (!room || !msg || typeof msg !== "object") return;
-  const player = room.players.get(conn.peer);
+// --- Arrivée d'un invité : défi signé, puis admission ----------------------------
 
-  if (msg.t === "hello" && !player) {
-    const name = String(msg.name ?? "").trim().slice(0, 24) || t("defaultGuest");
-    room.players.set(conn.peer, { id: conn.peer, name, score: 0, conn });
-    conn.send({ t: "welcome", code: room.code, chat: room.chat.map(publicChat) });
-    conn.send(publicState());
-    if (lastSync) conn.send(lastSync);
-    systemMessage("chatJoined", name);
+function acceptConnection(conn) {
+  if (!room) return;
+  if (room.players.size + room.pending.size >= MAX_PLAYERS) {
+    conn.on("open", () => {
+      safeSend(conn, { t: "full" });
+      setTimeout(() => conn.close(), 300);
+    });
     return;
   }
-  if (!player) return;
+  const entry = {
+    challenge: hex(crypto.getRandomValues(new Uint8Array(16))),
+    checking: false,
+    timer: setTimeout(() => conn.close(), room.public ? HELLO_TIMEOUT_PUBLIC : HELLO_TIMEOUT_PRIVATE),
+  };
+  room.pending.set(conn, entry);
+  conn.on("open", () => {
+    safeSend(conn, { t: "challenge", c: entry.challenge, room: room?.code, pow: room?.public ? POW_BITS : 0 });
+  });
+  conn.on("data", (msg) => onConnData(conn, msg));
+  conn.on("close", () => dropConn(conn));
+  conn.on("error", () => dropConn(conn));
+}
+
+// Poignée de main valide : signée par l'identité, pour ce salon et ce défi, récente
+function verifyHello(entry, msg) {
+  const ev = msg?.ev;
+  if (!ev || typeof ev !== "object" || ev.kind !== HELLO_KIND || !/^[0-9a-f]{64}$/.test(ev.pubkey ?? "")) return null;
+  try {
+    if (!NostrTools.verifyEvent(ev)) return null;
+  } catch {
+    return null; // événement mal formé
+  }
+  const tag = (k) => (Array.isArray(ev.tags) ? ev.tags.find((x) => Array.isArray(x) && x[0] === k)?.[1] : undefined);
+  if (tag("room") !== room.code || tag("challenge") !== entry.challenge) return null;
+  if (Math.abs(nowSeconds() - ev.created_at) > 600) return null;
+  return { id: ev.pubkey, nonce: Number(tag("pow")) };
+}
+
+function onConnData(conn, msg) {
+  if (!room || !msg || typeof msg !== "object") return;
+  const entry = room.pending.get(conn);
+  if (entry) {
+    if (msg.t !== "hello" || entry.checking) return;
+    const hello = verifyHello(entry, msg);
+    if (!hello) return conn.close();
+    if (state.banned[hello.id] || room.kicked.has(hello.id)) {
+      safeSend(conn, { t: state.banned[hello.id] ? "banned" : "kicked" });
+      return setTimeout(() => conn.close(), 300);
+    }
+    if (!room.public) return admit(conn, entry, hello.id, msg.name);
+    if (!Number.isSafeInteger(hello.nonce) || hello.nonce < 0) return conn.close();
+    entry.checking = true;
+    powBits(hello.id, hello.nonce).then((bits) => {
+      if (bits < POW_BITS) return conn.close();
+      powOk.set(hello.id, hello.nonce);
+      if (room?.pending.get(conn) === entry && conn.open) admit(conn, entry, hello.id, msg.name);
+    });
+    return;
+  }
+  const player = [...room.players.values()].find((p) => p.conn === conn);
+  if (player) onPlayerData(player, msg);
+}
+
+// Texte venu d'un invité : sans caractères de contrôle, espaces resserrés, longueur bornée
+function cleanText(text, max) {
+  return String(text ?? "")
+    .replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+// Noms uniques dans le salon (et jamais celui de l'hôte) : « Alex », « Alex 2 »…
+function uniqueName(name, id) {
+  const taken = new Set(["hôte", "host", ...[...room.players.values()].filter((p) => p.id !== id).map((p) => p.name.toLowerCase())]);
+  let candidate = name;
+  for (let n = 2; taken.has(candidate.toLowerCase()); n++) candidate = `${name} ${n}`;
+  return candidate;
+}
+
+// Couleur stable pour une identité
+function colorFor(id) {
+  return PALETTE[parseInt(id.slice(0, 8), 16) % PALETTE.length];
+}
+
+function admit(conn, entry, id, rawName) {
+  clearTimeout(entry.timer);
+  room.pending.delete(conn);
+  // Même identité déjà là (reconnexion, autre onglet) : la nouvelle connexion remplace l'ancienne
+  const old = room.players.get(id);
+  if (old) {
+    old.replaced = true;
+    old.conn.close();
+  }
+  const player = {
+    id,
+    conn,
+    name: uniqueName(cleanText(rawName, 24) || t("defaultGuest"), id),
+    color: colorFor(id),
+    score: old?.score ?? 0,
+    chatTimes: [],
+    metaTimes: [],
+    drops: [],
+    mutedUntil: 0,
+  };
+  room.players.set(id, player);
+  safeSend(conn, { t: "welcome", code: room.code, you: id, name: player.name, chat: room.chat.map(publicChat) });
+  safeSend(conn, publicState());
+  if (lastSync) safeSend(conn, lastSync);
+  if (!old) systemMessage("chatJoined", player.name);
+  else update();
+}
+
+function dropConn(conn) {
+  if (!room) return;
+  const entry = room.pending.get(conn);
+  if (entry) {
+    clearTimeout(entry.timer);
+    room.pending.delete(conn);
+  }
+  for (const p of room.players.values()) {
+    if (p.conn !== conn) continue;
+    room.players.delete(p.id);
+    if (!p.replaced && !p.removed) systemMessage("chatLeft", p.name);
+    update();
+  }
+}
+
+function onPlayerData(p, msg) {
+  const now = Date.now();
+  if (p.mutedUntil > now) return;
+  const chatty = msg.t === "chat";
+  if (!rateOk(chatty ? p.chatTimes : p.metaTimes, chatty ? RECV_PER_SECOND : META_PER_SECOND, now)) return flooded(p, now);
 
   switch (msg.t) {
     case "chat":
-      addChat({ from: player.id, name: player.name, text: String(msg.text ?? "").slice(0, 300), ref: cleanRef(msg.ref) });
+      addChat({ from: p.id, name: p.name, color: p.color, text: cleanText(msg.text, TEXT_MAX), ref: cleanRef(msg.ref) });
       break;
     case "ping":
-      conn.send({ t: "pong", at: msg.at });
+      safeSend(p.conn, { t: "pong", at: Number(msg.at) || 0 });
+      break;
+    case "bye":
+      p.conn.close();
       break;
   }
+}
+
+function flooded(p, now) {
+  p.drops.push(now);
+  while (p.drops.length && now - p.drops[0] > 10000) p.drops.shift();
+  if (p.drops.length < FLOOD_DROPS) return;
+  p.drops = [];
+  p.mutedUntil = now + FLOOD_MUTE;
+  safeSend(p.conn, { t: "muted", ms: FLOOD_MUTE });
+  systemMessage("chatFlood", p.name);
+}
+
+// Exclure : jusqu'à la fermeture du salon. Bannir : pour de bon (liste dans les réglages).
+function kick(id, permanent = false) {
+  const p = room?.players.get(id);
+  if (!p) return;
+  room.kicked.add(id);
+  if (permanent) {
+    state.banned[id] = p.name;
+    save();
+  }
+  p.removed = true;
+  safeSend(p.conn, { t: permanent ? "banned" : "kicked" });
+  setTimeout(() => p.conn.close(), 300);
+  systemMessage(permanent ? "chatBanned" : "chatKicked", p.name);
 }
 
 // Référence envoyée par un invité : une vidéo de la playlist, un chapitre ou un moment
 function cleanRef(ref) {
-  if (!ref || typeof ref !== "object" || !/^[\w-]{11}$/.test(ref.id)) return null;
+  if (!ref || typeof ref !== "object" || typeof ref.id !== "string" || !/^[\w-]{11}$/.test(ref.id)) return null;
   const start = Number(ref.start);
   return {
     id: ref.id,
-    start: Number.isFinite(start) && start >= 0 ? Math.floor(start) : 0,
-    label: String(ref.label ?? "").slice(0, 120),
+    start: Number.isFinite(start) && start >= 0 && start < 360000 ? Math.floor(start) : 0,
+    label: cleanText(ref.label, 120),
   };
+}
+
+// --- Aide à l'arbitrage ---------------------------------------------------------
+// Une proposition qui ressemble au titre du morceau (ou du chapitre) est marquée
+// « probable » chez l'hôte. Il reste seul juge : c'est lui qui donne les points.
+
+const NOISE = /\b(official|officiel(le)?|video|clip|lyrics?|paroles|audio|hd|4k|mv|music|musique|full|version|remaster(ed)?|feat|ft|prod)\b/g;
+
+function simplify(text) {
+  return String(text)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+    .replace(NOISE, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function similarity(a, b) {
+  if (a === b) return 1;
+  const m = a.length;
+  const n = b.length;
+  if (!m || !n) return 0;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return 1 - prev[n] / Math.max(m, n);
+}
+
+// Les morceaux d'un titre : « Chainsaw Man — Kick Back » → « chainsaw man », « kick back »…
+function answerParts(...titles) {
+  const parts = new Set();
+  for (const title of titles) {
+    if (!title) continue;
+    parts.add(simplify(title));
+    // Séparateurs : « - », « — », « | », « · », « / », « : » (même collé au mot d'avant), guillemets
+    for (const piece of String(title).split(/\s[-–—]\s|\s*[|·/:]\s+|["“”«»]/)) {
+      const s = simplify(piece);
+      if (s.length >= 2) parts.add(s);
+    }
+  }
+  parts.delete("");
+  return [...parts];
+}
+
+function looksRight(guess, parts) {
+  const g = simplify(guess);
+  if (g.length < 3) return false;
+  const gWords = new Set(g.split(" ").filter((w) => w.length >= 2));
+  return parts.some((part) => {
+    if (similarity(g, part) >= 0.8) return true;
+    if (g.length >= 4 && part.includes(g) && g.length >= part.length * 0.5) return true;
+    // La plupart des mots d'un morceau du titre sont dans la proposition
+    const words = part.split(" ").filter((w) => w.length >= 2);
+    const found = words.filter((w) => gWords.has(w) || [...gWords].some((x) => x.length >= 4 && similarity(x, w) >= 0.8));
+    return words.length > 0 && found.length >= Math.max(1, Math.ceil(words.length * 0.6));
+  });
+}
+
+function guessHint(text) {
+  if (state.mode !== "blind" || !["playing", "timeup", "revealed"].includes(game.phase) || !text) return false;
+  const item = items()[state.index];
+  if (!item) return false;
+  return looksRight(text, answerParts(game.chapter?.title, game.chapter ? null : item.title));
 }
 
 // --- Chat ------------------------------------------------------------------
@@ -177,17 +457,25 @@ function guessing() {
 
 function addChat(entry) {
   if (!entry.text && !entry.ref && !entry.system) return;
-  const msg = { id: ++chatSeq, at: Date.now(), private: !entry.system && entry.from !== "host" && guessing(), ...entry };
+  const fromGuest = !entry.system && entry.from !== "host";
+  const msg = {
+    id: ++chatSeq,
+    at: Date.now(),
+    private: fromGuest && guessing(),
+    hint: fromGuest && guessHint(entry.text), // jamais envoyé aux invités
+    ...entry,
+  };
   room.chat.push(msg);
   if (room.chat.length > CHAT_LIMIT) room.chat.shift();
   broadcast({ t: "chat", msg: publicChat(msg) });
   update();
 }
 
+// Ce que voient les invités : jamais l'indice d'arbitrage, et rien d'une proposition masquée
 function publicChat(msg) {
-  const { id, at, from, name, system, key, args, ref } = msg;
-  if (msg.private) return { id, at, from, name, masked: true };
-  return { id, at, from, name, system, key, args, text: msg.text, ref };
+  const { id, at, from, name, color, system, key, args, ref } = msg;
+  if (msg.private) return { id, at, from, name, color, masked: true };
+  return { id, at, from, name, color, system, key, args, text: msg.text, ref };
 }
 
 // Message système : envoyé comme clé de traduction, chacun le lit dans sa langue
@@ -197,7 +485,8 @@ function systemMessage(key, ...args) {
 
 // Le nom « Hôte » est traduit à l'affichage (from === "host")
 function hostChat(text, ref = null) {
-  if (room) addChat({ from: "host", name: "", text: String(text).slice(0, 300), ref });
+  if (!room || !rateOk(hostTimes, HOST_SEND_PER_SECOND)) return;
+  addChat({ from: "host", name: "", text: cleanText(text, TEXT_MAX), ref });
 }
 
 // À la révélation, les propositions de la manche deviennent visibles de tous
@@ -225,13 +514,17 @@ function currentAnswer() {
   return game.chapter?.title ? `${game.chapter.title} · ${item.title}` : item.title;
 }
 
+function playerList() {
+  return [...room.players.values()].map(({ id, name, color, score }) => ({ id, name, color, score }));
+}
+
 function publicState() {
   const listen = state.mode === "listen";
   const item = items()[state.index];
   return {
     t: "state",
     mode: state.mode,
-    players: [...room.players.values()].map(({ id, name, score }) => ({ id, name, score })),
+    players: playerList(),
     // En blind test, les invités ne voient ni la playlist ni le titre avant la révélation
     playlist: listen ? items().map(({ id, title, chapters }) => ({ id, title, chapters: chapters ?? null })) : null,
     index: listen ? state.index : null,
@@ -282,7 +575,7 @@ function roomSnapshot() {
     link: room.link,
     status: room.status,
     public: room.public,
-    players: [...room.players.values()].map(({ id, name, score }) => ({ id, name, score })),
+    players: playerList(),
     chat: room.chat,
   };
 }
@@ -300,7 +593,6 @@ let announceTimer = null;
 let lastAnnounced = "";
 let publicRooms = { list: [], loading: false, at: 0 };
 
-const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 function pool() {
   return (nostrPool ??= new NostrTools.SimplePool());

@@ -152,6 +152,21 @@ const STRINGS = {
     chatLeft: "{0} est parti",
     chatPointPlus: "+{0} point pour {1} ({2})",
     chatPointMinus: "{0} point pour {1} ({2})",
+    chatFlood: "{0} envoie trop de messages : sourdine pendant 1 minute",
+    chatKicked: "{0} a été exclu du salon",
+    chatBanned: "{0} a été banni",
+
+    // Sécurité, chat
+    kick: "Exclure jusqu'à la fermeture du salon",
+    ban: "Bannir pour de bon (liste dans les réglages)",
+    probable: "✓ probable",
+    probableTitle: "Cette proposition ressemble au titre : à toi de juger",
+    chatSound: "Son à chaque nouveau message du salon",
+    bannedList: "Joueurs bannis",
+    noBanned: "Personne n'est banni.",
+    unban: "Débannir",
+    ipNotice:
+      "Les invités se connectent directement à toi (pair-à-pair) : ils voient ton adresse IP et tu vois la leur. Dans un salon public, chaque nouvelle identité doit d'abord fournir une preuve de travail (environ 30 s, une seule fois) : un joueur banni ne peut pas revenir en boucle.",
   },
 
   en: {
@@ -302,6 +317,20 @@ const STRINGS = {
     chatLeft: "{0} left",
     chatPointPlus: "+{0} point for {1} ({2})",
     chatPointMinus: "{0} point for {1} ({2})",
+    chatFlood: "{0} is sending too many messages: muted for 1 minute",
+    chatKicked: "{0} was kicked from the room",
+    chatBanned: "{0} was banned",
+
+    kick: "Kick until the room closes",
+    ban: "Ban for good (list in the settings)",
+    probable: "✓ likely",
+    probableTitle: "This guess looks like the title: your call",
+    chatSound: "Sound on each new room message",
+    bannedList: "Banned players",
+    noBanned: "Nobody is banned.",
+    unban: "Unban",
+    ipNotice:
+      "Guests connect straight to you (peer-to-peer): they see your IP address and you see theirs. In a public room, every new identity must first provide a proof of work (about 30 s, only once): a banned player can't keep coming back.",
   },
 };
 

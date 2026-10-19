@@ -100,12 +100,33 @@ $("#open-settings").addEventListener("click", () => showSettings(true));
 $("#close-settings").addEventListener("click", () => showSettings(false));
 $("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
 $("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
+$("#chat-sound").addEventListener("change", (e) => act("setSetting", "chatSound", e.target.checked));
 
 // --- Salon -------------------------------------------------------------------
 
 // Bouton 🌐 : affiche les deux lignes du salon au-dessus des onglets
 let roomOpen = false;
 let hadRoom = false;
+let lastSeenId = 0;   // dernier message lu (chat déplié)
+let lastHeardId = 0;  // dernier message ayant déclenché le son
+
+// Petit « bip » à l'arrivée d'un message (réglage), sans fichier audio
+let audio = null;
+function beep() {
+  try {
+    audio ??= new AudioContext();
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.08, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.15);
+    osc.connect(gain).connect(audio.destination);
+    osc.start();
+    osc.stop(audio.currentTime + 0.15);
+  } catch {
+    // pas de son possible : tant pis
+  }
+}
 $("#toggle-room").addEventListener("click", () => {
   roomOpen = !roomOpen;
   if (roomOpen) act("refreshPublicRooms");
@@ -259,6 +280,19 @@ function renderRoom(blind) {
   hadRoom = !!room;
   $("#toggle-room").hidden = !view.state.showMulti && !room;
   $("#toggle-room").classList.toggle("on", roomOpen);
+
+  // Messages des autres : badge de non-lus sur 🌐 quand le chat est replié, son en option
+  const others = room ? room.chat.filter((m) => !m.system && m.from !== "host") : [];
+  const latest = others.length ? others[others.length - 1].id : 0;
+  if (roomOpen && !$("#main").hidden) lastSeenId = latest;
+  const unread = others.filter((m) => m.id > lastSeenId).length;
+  $("#unread").hidden = !unread;
+  $("#unread").textContent = unread > 9 ? "9+" : String(unread);
+  if (latest > lastHeardId) {
+    if (lastHeardId && view.state.chatSound) beep();
+    lastHeardId = latest;
+  }
+
   $("#online").hidden = !roomOpen;
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
@@ -276,13 +310,18 @@ function renderRoom(blind) {
   $("#room-status").textContent =
     room.status === "opening" ? t("roomOpening") : room.status === "error" ? t("roomError") : t("guests", room.players.length);
 
+  // Pastilles des joueurs : couleur, score ; au survol, exclure ou bannir
   $("#room-players").replaceChildren(
     ...room.players.map((p) => {
       const li = el("li");
-      li.append(el("span", p.name), el("b", String(p.score)));
+      const name = li.appendChild(el("span", p.name));
+      name.style.color = p.color;
+      li.append(el("b", String(p.score)));
       if (blind) {
         li.append(button("+1", () => act("award", p.id, 1)), button("−1", () => act("award", p.id, -1)));
       }
+      li.appendChild(button("✕", () => act("kick", p.id), "mod")).title = t("kick");
+      li.appendChild(button("🚫", () => act("ban", p.id), "mod")).title = t("ban");
       return li;
     })
   );
@@ -294,8 +333,11 @@ function renderRoom(blind) {
       if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "system");
       const p = el("p", null, msg.private ? "private" : "");
       if (msg.private) p.append("🔒 ");
-      p.append(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
+      const who = p.appendChild(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
+      if (msg.color) who.style.color = msg.color;
       if (msg.text) chatText(p, msg.text);
+      // Aide à l'arbitrage : la proposition ressemble au titre
+      if (msg.hint) p.appendChild(el("span", t("probable"), "hint")).title = t("probableTitle");
       if (msg.ref) {
         const label = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
         p.append(button(label, () => act("playRef", msg.ref), "ref"));
@@ -492,6 +534,18 @@ function render() {
 
   $("#lang").value = state.lang ?? "auto";
   $("#show-multi").checked = state.showMulti !== false;
+  $("#chat-sound").checked = !!state.chatSound;
+  const banned = Object.entries(state.banned ?? {});
+  $("#banned").replaceChildren(
+    ...(banned.length
+      ? banned.map(([id, name]) => {
+          const li = el("li");
+          li.appendChild(el("span", name)).title = id;
+          li.append(button(t("unban"), () => act("unban", id)));
+          return li;
+        })
+      : [el("li", t("noBanned"), "muted")])
+  );
   $("#log").textContent = view.log.join("\n");
 
   if (blind) renderBlind(game, items().length, multi);

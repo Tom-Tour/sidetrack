@@ -13,7 +13,7 @@
       <button id="pl-rename" class="icon" data-i18n-title="rename">✎</button>
       <button id="pl-delete" class="icon" data-i18n-title="deletePlaylist">🗑</button>
       <button id="pl-export" class="icon" data-i18n-title="exportYoutube">⤴</button>
-      <button id="toggle-room" class="icon" data-i18n-title="room">🌐</button>
+      <button id="toggle-room" class="icon" data-i18n-title="room">🌐<span id="unread" hidden></span></button>
       <button id="open-settings" class="icon" data-i18n-title="settings">⚙</button>
     </div>
     <p id="notice" hidden></p>
@@ -123,6 +123,12 @@
       </label>
       <label><input type="checkbox" id="show-multi"> <span data-i18n="showMulti"></span></label>
       <p class="muted" data-i18n="showMultiHelp"></p>
+      <label><input type="checkbox" id="chat-sound"> <span data-i18n="chatSound"></span></label>
+      <p class="muted" data-i18n="ipNotice"></p>
+    </fieldset>
+    <fieldset>
+      <legend data-i18n="bannedList"></legend>
+      <ul id="banned"></ul>
     </fieldset>
     <details>
       <summary data-i18n="log"></summary>
