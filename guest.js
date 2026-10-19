@@ -12,6 +12,8 @@ let identity = null; // { secret, pubkey }
 let proof = null;    // { pubkey, bits, nonce }
 let mining = null;   // { bits, promise } : calcul en cours
 let playerTick = null; // dernière position annoncée par notre lecteur
+let joinSeq = 0;       // seule la dernière demande pour rejoindre compte (double clic…)
+const HOST_SILENCE = 30 * 1000; // l'hôte répond à nos pings : au-delà, il est perdu
 
 const GUEST_SEND_PER_SECOND = 2; // ce que l'hôte accepte sans filtrer (voir RECV_PER_SECOND)
 const unhex = (s) => Uint8Array.from(s.match(/../g).map((h) => parseInt(h, 16)));
@@ -82,8 +84,12 @@ async function joinRoom(code) {
   code = roomName(code);
   if (!ROOM_NAME.test(code)) return log(t("logBadCode"));
   if (room) return; // on héberge déjà un salon
-  leaveRoom();
+  // Déjà dans ce salon (ou en train d'y entrer) : surtout pas une seconde connexion
+  if (guest && guest.code === code && guest.status !== "ended") return;
+  leaveRoom(); // annule aussi une demande précédente encore en cours
+  const seq = ++joinSeq;
   await identityReady;
+  if (seq !== joinSeq || room) return;
   // Notre propre musique et notre partie laissent la place au salon
   resetGame();
   send({ action: "pause" });
@@ -180,6 +186,7 @@ function endGuest(g, key, ...args) {
 }
 
 function leaveRoom() {
+  joinSeq++;
   const g = guest;
   if (!g) return;
   guest = null;
@@ -194,13 +201,19 @@ function leaveRoom() {
 
 function onHostData(g, msg) {
   if (!msg || typeof msg !== "object") return;
+  g.heard = Date.now();
   switch (msg.t) {
     case "welcome":
       g.status = "joined";
       g.me = msg.you;
       g.chat = Array.isArray(msg.chat) ? msg.chat : [];
       log(t("logJoined", g.code));
-      g.pingTimer = setInterval(() => safeSend(g.conn, { t: "ping", at: performance.now() }), 5000);
+      clearInterval(g.pingTimer);
+      g.heard = Date.now();
+      g.pingTimer = setInterval(() => {
+        if (Date.now() - g.heard > HOST_SILENCE) return endGuest(g, "guestDisconnected");
+        safeSend(g.conn, { t: "ping", at: performance.now() });
+      }, 5000);
       safeSend(g.conn, { t: "ping", at: performance.now() });
       break;
     case "state":

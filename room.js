@@ -39,6 +39,10 @@ const RECV_PER_SECOND = 3; // messages de chat acceptés, par joueur
 const META_PER_SECOND = 4; // autres messages (ping…)
 const FLOOD_DROPS = 30;    // messages ignorés en 10 s avant la sourdine
 const FLOOD_MUTE = 60 * 1000;
+// WebRTC ne signale pas toujours une connexion perdue (onglet fermé, extension rechargée,
+// réseau coupé) : un invité qui ne donne plus signe de vie (ping toutes les 5 s) est retiré,
+// sinon il resterait en fantôme et réapparaîtrait en double à son retour.
+const GHOST_TIMEOUT = 30 * 1000;
 
 // Couleurs des joueurs, lisibles sur fond clair comme sombre
 const PALETTE = ["#e5484d", "#f76b15", "#d5a000", "#30a46c", "#12a594", "#0090ff", "#6e56cf", "#d6409f", "#8e4ec6", "#ab6400"];
@@ -113,6 +117,7 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     pending: new Map(),
     kicked: new Set(),
     chat: [],
+    sweep: setInterval(sweepGhosts, 5000),
   };
   lastPublic = "";
 
@@ -131,6 +136,7 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     if (e.type === "unavailable-id") {
       // Nom déjà pris : ce salon existe, on le rejoint (même champ pour créer ou rejoindre)
       peer.destroy();
+      clearInterval(room.sweep);
       room = null;
       log(t("logJoinExisting", code));
       update();
@@ -149,6 +155,7 @@ function closeRoom() {
   if (!room) return;
   if (room.public) stopAnnouncing();
   broadcast({ t: "closed" });
+  clearInterval(room.sweep);
   const { peer } = room;
   room = null;
   setTimeout(() => peer.destroy(), 300); // laisse partir le message de fermeture
@@ -247,7 +254,23 @@ function onConnData(conn, msg) {
     return;
   }
   const player = [...room.players.values()].find((p) => p.conn === conn);
-  if (player) onPlayerData(player, msg);
+  if (!player) return;
+  player.lastSeen = Date.now();
+  onPlayerData(player, msg);
+}
+
+function sweepGhosts() {
+  if (!room) return;
+  const now = Date.now();
+  for (const p of room.players.values()) {
+    if (now - p.lastSeen < GHOST_TIMEOUT) continue;
+    room.players.delete(p.id);
+    p.removed = true;
+    try {
+      p.conn.close();
+    } catch {}
+    systemMessage("chatLeft", p.name);
+  }
 }
 
 // Texte venu d'un invité : sans caractères de contrôle, espaces resserrés, longueur bornée
@@ -289,6 +312,7 @@ function admit(conn, entry, id, rawName) {
     score: old?.score ?? 0,
     chatTimes: [],
     metaTimes: [],
+    lastSeen: Date.now(),
     drops: [],
     mutedUntil: 0,
   };

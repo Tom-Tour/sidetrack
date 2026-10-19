@@ -150,6 +150,7 @@ let lastSync = null;   // { id, time, playing } : position de l'hôte
 let latency = 0;       // demi-aller-retour vers l'hôte, en secondes
 let joined = false;
 let ended = false;     // l'hôte a mis fin à notre présence (et dit pourquoi)
+let heard = 0;         // dernier message de l'hôte (il répond à nos pings toutes les 5 s)
 let apiReady = false;
 let player = null;
 let playerReady = false;
@@ -334,6 +335,7 @@ function loginError(text) {
 }
 
 function join(code, name) {
+  if (joined) return; // déjà dans le salon : pas de seconde connexion
   loginError(null);
   peer?.destroy();
   peer = new Peer();
@@ -362,6 +364,7 @@ function send(msg) {
 // --- Messages de l'hôte ------------------------------------------------------
 
 function onData(msg) {
+  heard = Date.now();
   switch (msg?.t) {
     case "welcome":
       joined = true;
@@ -373,7 +376,11 @@ function onData(msg) {
       chat.push(...msg.chat);
       renderChat();
       createPlayer();
-      setInterval(() => send({ t: "ping", at: performance.now() }), 5000);
+      setInterval(() => {
+        // Plus de nouvelles de l'hôte : la connexion est perdue même si WebRTC ne l'a pas dit
+        if (!ended && Date.now() - heard > 30000) setStatus(t("disconnected"));
+        send({ t: "ping", at: performance.now() });
+      }, 5000);
       send({ t: "ping", at: performance.now() });
       break;
     case "state":
