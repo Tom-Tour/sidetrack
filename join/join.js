@@ -197,7 +197,7 @@ function savedProof(bits) {
 
 function startMining(bits) {
   if (mining && mining.bits >= bits) return mining.promise;
-  const worker = new Worker("../pow-worker.js");
+  const worker = new Worker("../pow-worker.js?v=2");
   const job = { bits, tries: 0 };
   job.promise = new Promise((resolve, reject) => {
     worker.onmessage = ({ data }) => {
