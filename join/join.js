@@ -48,7 +48,7 @@ const STRINGS = {
     chatFlood: "{0} envoie trop de messages : sourdine pendant 1 minute",
     chatKicked: "{0} a été exclu du salon",
     chatBanned: "{0} a été banni",
-    preparing: "Préparation de ton identité anti-spam (une seule fois, environ 30 s)… {0} essais",
+    preparing: "Préparation de ton identité anti-spam (une seule fois, quelques secondes)… {0} essais",
     full: "Ce salon est complet (24 joueurs).",
     kicked: "L'hôte t'a exclu du salon.",
     banned: "L'hôte t'a banni de ses salons.",
@@ -98,7 +98,7 @@ const STRINGS = {
     chatFlood: "{0} is sending too many messages: muted for 1 minute",
     chatKicked: "{0} was kicked from the room",
     chatBanned: "{0} was banned",
-    preparing: "Preparing your anti-spam identity (only once, about 30 s)… {0} tries",
+    preparing: "Preparing your anti-spam identity (only once, a few seconds)… {0} tries",
     full: "This room is full (24 players).",
     kicked: "The host kicked you from the room.",
     banned: "The host banned you from their rooms.",
@@ -184,14 +184,14 @@ if (typeof secret !== "string" || !/^[0-9a-f]{64}$/.test(secret)) {
 const identity = { secret: unhex(secret), pubkey: NostrTools.getPublicKey(unhex(secret)) };
 
 // Bits exigés par un salon public (POW_BITS dans room.js)
-const PREMINE_BITS = 8;
+const PREMINE_BITS = 7;
 
 let mining = null;      // { bits, tries, promise } : calcul en cours
 let powWaiting = false; // l'invité attend la fin du calcul pour entrer
 
-// Preuve déjà calculée dans ce navigateur, ou null
+// Preuve déjà calculée dans ce navigateur, ou null (v2 : paramètres de scrypt allégés)
 function savedProof(bits) {
-  const saved = store("sidetrack-pow");
+  const saved = store("sidetrack-pow-v2");
   return saved?.pubkey === identity.pubkey && saved.bits >= bits && Number.isSafeInteger(saved.nonce) ? saved.nonce : null;
 }
 
@@ -199,7 +199,7 @@ function startMining(bits) {
   if (mining && mining.bits >= bits) return mining.promise;
   const worker = new Worker("../pow-worker.js");
   const job = { bits, tries: 0 };
-  job.promise = new Promise((resolve) => {
+  job.promise = new Promise((resolve, reject) => {
     worker.onmessage = ({ data }) => {
       if (data.t === "progress") {
         job.tries = data.tries;
@@ -207,8 +207,13 @@ function startMining(bits) {
         return;
       }
       worker.terminate();
-      store("sidetrack-pow", { pubkey: identity.pubkey, bits, nonce: data.nonce });
+      store("sidetrack-pow-v2", { pubkey: identity.pubkey, bits, nonce: data.nonce });
       resolve(data.nonce);
+    };
+    worker.onerror = (e) => {
+      worker.terminate();
+      if (mining === job) mining = null;
+      reject(e);
     };
   });
   worker.postMessage({ t: "mine", pubkey: identity.pubkey, bits });
@@ -216,10 +221,9 @@ function startMining(bits) {
   return job.promise;
 }
 
-// Preuve de travail d'au moins `bits` bits pour notre identité (cherchée une seule fois)
-async function proofOfWork(bits) {
-  const saved = savedProof(bits);
-  if (saved != null) return saved;
+// Attend une preuve de travail d'au moins `bits` bits pour notre identité, en affichant
+// la progression (calculée une seule fois, souvent déjà finie grâce au calcul de fond)
+async function waitProof(bits) {
   powWaiting = true;
   loginStatus(t("preparing", mining?.tries ?? 0));
   try {
@@ -233,16 +237,26 @@ async function proofOfWork(bits) {
 // il est souvent déjà fini quand on rejoint un salon public
 if (savedProof(PREMINE_BITS) == null) {
   try {
-    startMining(PREMINE_BITS);
+    startMining(PREMINE_BITS).catch(() => {});
   } catch {
     // pas de Worker : le calcul se fera à la demande
   }
 }
 
 // Réponse au défi : signée par notre identité, pour ce salon et ce défi précis
-async function answerChallenge(msg, name) {
+async function answerChallenge(msg, code, name) {
   const pow = Math.max(0, Math.floor(Number(msg.pow) || 0));
-  const nonce = pow ? await proofOfWork(pow) : 0;
+  const nonce = pow ? savedProof(pow) : 0;
+  if (nonce == null) {
+    // Preuve pas encore prête : on ne fait pas attendre l'hôte, on revient quand elle l'est
+    peer?.destroy();
+    try {
+      await waitProof(pow);
+    } catch {
+      return loginError(t("cantConnect", "pow"));
+    }
+    return join(code, name);
+  }
   const ev = NostrTools.finalizeEvent(
     {
       kind: HELLO_KIND,
@@ -317,9 +331,9 @@ function join(code, name) {
   peer.on("open", () => {
     conn = peer.connect(ROOM_PREFIX + code, { reliable: true, serialization: "json" });
     // L'hôte commence par un défi : on y répond (voir onData)
-    conn.on("data", (msg) => (msg?.t === "challenge" ? answerChallenge(msg, name) : onData(msg)));
+    conn.on("data", (msg) => (msg?.t === "challenge" ? answerChallenge(msg, code, name) : onData(msg)));
     // Fermeture qui suit un message de l'hôte (salon fermé, exclusion…) : on garde ce message
-    conn.on("close", () => ended || setStatus(t("disconnected")));
+    conn.on("close", () => ended || powWaiting || setStatus(t("disconnected")));
   });
   peer.on("error", (e) => {
     const text = e.type === "peer-unavailable" ? t("notFound") : t("cantConnect", e.type);

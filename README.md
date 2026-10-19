@@ -38,7 +38,7 @@ Public rooms are announced on public [Nostr](https://nostr.com) relays with [nos
 ## Room security
 
 - **Signed identities**: every guest has a key kept in their browser and signs a random challenge from the host on each connection, so nobody can pose as someone else or replay a connection. Kicking (until the room closes) and banning (for good, list in the settings) target that identity
-- **Proof of work in public rooms**: a new identity must first find a number such that `scrypt(identity + number)` starts with 8 zero bits (about 30 seconds, once per browser). Checking it takes a fraction of a second. scrypt needs 16 MB per try, so graphics cards gain almost nothing: a banned player can't come back with thousands of new identities. Private rooms skip it
+- **Proof of work in public rooms**: a new identity must first find a number such that `scrypt(identity + number)` starts with 7 zero bits (a few seconds, once per browser, computed in the background as soon as the join page opens). Checking it takes a fraction of a second. scrypt needs 4 MB per try, so graphics cards gain almost nothing: a banned player can't come back with thousands of new identities. Private rooms skip it
 - **Flood control**, the same fixed rule for everyone: guests send at most 2 messages per second, the host accepts 3; someone who keeps pushing (a modified client) is muted for a minute
 - 24 players per room at most; everything coming from guests is validated and cleaned
 - **IP addresses**: as in any peer-to-peer connection, the host and guests can see each other's IP address. Bans don't rely on IPs (unreliable with WebRTC, and a VPN changes them): the proof of work does that job

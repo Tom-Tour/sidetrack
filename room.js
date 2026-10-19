@@ -9,8 +9,8 @@
 // - chaque invité a une identité (clé Nostr gardée dans son navigateur) et signe le défi
 //   aléatoire envoyé par l'hôte : impossible de se faire passer pour un autre ou de rejouer
 //   une connexion ; exclure ou bannir vise cette identité ;
-// - dans un salon public, une identité coûte une preuve de travail (pow-worker.js, environ
-//   30 s une seule fois) : un banni ne revient pas avec des milliers de nouvelles identités ;
+// - dans un salon public, une identité coûte une preuve de travail (pow-worker.js, quelques
+//   secondes une seule fois) : un banni ne revient pas avec des milliers de nouvelles identités ;
 // - débit fixe et identique pour tous : au-delà, les messages sont ignorés, et qui insiste
 //   est mis en sourdine une minute ; tout ce qui arrive des invités est nettoyé ;
 // - 24 joueurs au plus.
@@ -26,9 +26,9 @@ const CHAT_LIMIT = 200;
 const TEXT_MAX = 300;
 const MAX_PLAYERS = 24;
 const HELLO_KIND = 27235; // éphémère : jamais publié, sert seulement à signer la poignée de main
-const POW_BITS = 8;       // bits à zéro exigés dans un salon public : ~256 essais de scrypt
-// Temps laissé à un invité pour se présenter (la preuve de travail peut prendre ~30 s)
-const HELLO_TIMEOUT_PUBLIC = 120 * 1000;
+const POW_BITS = 7;       // bits à zéro exigés dans un salon public : ~128 essais de scrypt
+// Temps laissé à un invité pour se présenter (sa preuve de travail est calculée avant)
+const HELLO_TIMEOUT_PUBLIC = 30 * 1000;
 const HELLO_TIMEOUT_PRIVATE = 20 * 1000;
 
 // Anti-flood : la réception tolère un peu plus que ce que la page invité envoie au plus,

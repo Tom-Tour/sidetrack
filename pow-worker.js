@@ -5,14 +5,14 @@
 // Une identité n'est acceptée dans un salon public que si elle s'accompagne d'un nombre
 // (nonce) tel que scrypt(identité + nonce) commence par assez de bits à zéro. Le trouver
 // demande des centaines d'essais (une seule fois par navigateur) ; le vérifier, un seul.
-// scrypt réclame 16 Mo de mémoire par essai : les cartes graphiques n'y gagnent presque rien.
+// scrypt réclame 4 Mo de mémoire par essai : les cartes graphiques n'y gagnent presque rien.
 
 importScripts("vendor/scrypt.js");
 
-const N = 16384;
+const N = 4096;
 const R = 8;
 const enc = new TextEncoder();
-const SALT = enc.encode("sidetrack-pow-v1");
+const SALT = enc.encode("sidetrack-pow-v2");
 
 function powHash(pubkey, nonce) {
   return scrypt.syncScrypt(enc.encode(`sidetrack-identity:${pubkey}:${nonce}`), SALT, N, R, 1, 32);
