@@ -1,4 +1,4 @@
-// Moteur de Sidetrack : playlists, lecteur et blind test.
+// Moteur de Sidetrack : playlists, lecteur et blind test (le salon multijoueur est dans room.js).
 // Tourne en arrière-plan pour que la musique continue barre latérale fermée.
 // La barre latérale n'est qu'une télécommande reliée par un port.
 //
@@ -48,7 +48,7 @@ const ports = new Set();
 let updateScheduled = null;
 
 function snapshot() {
-  return { state, game, playerState, notice, log: logLines };
+  return { state, game, playerState, notice, log: logLines, room: roomSnapshot() };
 }
 
 // Regroupe les mises à jour (un import de playlist en déclenche des centaines)
@@ -58,6 +58,7 @@ function update() {
     updateScheduled = null;
     const snap = snapshot();
     for (const port of ports) port.postMessage(snap);
+    roomUpdate();
   }, 30);
 }
 
@@ -199,6 +200,24 @@ function addLink(text) {
   save();
 }
 
+// Glisser-déposer dans la file : le morceau en cours reste le même
+function moveItem(from, to) {
+  const list = items();
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return;
+  const current = list[state.index];
+  list.splice(to, 0, list.splice(from, 1)[0]);
+  state.index = current ? list.indexOf(current) : -1;
+  update();
+  save();
+}
+
+async function loadChapters(i) {
+  const item = items()[i];
+  if (!item) return;
+  await ensureChapters([item]);
+  update();
+}
+
 function removeItem(i) {
   items().splice(i, 1);
   if (i < state.index) state.index--;
@@ -318,8 +337,9 @@ async function hidePlayerTab() {
 
 // Affiche l'onglet du lecteur ; s'il est déjà affiché et que toggle est vrai, revient à la navigation
 async function focusPlayer(toggle = false) {
-  // 📺 est inactif en blind test ; seul le message « Activer le son » peut y emmener
-  if (playerTabId == null || !playerPort || (toggle && state.mode === "blind")) return;
+  // 📺 est inactif en blind test solo ; seul le message « Activer le son » peut y emmener.
+  // Dans un salon, l'hôte est l'arbitre : il garde l'accès à la vidéo.
+  if (playerTabId == null || !playerPort || (toggle && state.mode === "blind" && !room)) return;
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
   if (active?.id === playerTabId) {
     if (toggle) backToBrowsing();
@@ -378,9 +398,13 @@ function onPlayerMessage(msg) {
       backToBrowsing();
       update();
       break;
+    case "tick":
+      roomTick(msg);
+      break;
     case "state":
       log(`État du lecteur : ${STATE_NAMES[msg.state] ?? msg.state}`);
       playerState = msg.state;
+      roomTick(msg, true);
       if (msg.state === 0) onEnded();
       update();
       break;
@@ -544,6 +568,7 @@ function timeUp() {
 function reveal() {
   clearInterval(gameTimer);
   game.phase = "revealed";
+  unmaskGuesses();
   send({ action: "play" });
   update();
 }
@@ -559,7 +584,7 @@ function setMode(mode) {
   if (state.mode === mode) return;
   state.mode = mode;
   resetGame();
-  if (mode === "blind") hidePlayerTab();
+  if (mode === "blind" && !room) hidePlayerTab();
   update();
   save();
 }
@@ -577,7 +602,23 @@ const actions = {
   deletePlaylist,
   addLink,
   removeItem,
+  moveItem,
+  loadChapters,
   play: (i) => play(i),
+  playAt: (i, start) => play(i, { start }),
+  seek: (time) => send({ action: "seek", time }),
+  // Clic de l'hôte sur une vidéo, un chapitre ou un moment proposé dans le chat :
+  // lance la vidéo à cet instant pour tout le salon
+  playRef: (ref) => {
+    const i = items().findIndex((item) => item.id === ref.id);
+    if (i < 0) return log("Cette vidéo n'est plus dans la playlist");
+    if (i === state.index && playerPort) send({ action: "seek", time: ref.start ?? 0 });
+    else play(i, { start: ref.start ?? 0 });
+  },
+  openRoom,
+  closeRoom,
+  hostChat: (text) => hostChat(text),
+  award: (playerId, delta) => award(playerId, delta),
   next,
   prev,
   toggle,

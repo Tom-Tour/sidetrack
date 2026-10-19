@@ -51,13 +51,36 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .controls button { flex: 1; }
 
 #queue { margin: 8px 0 0; padding-left: 24px; }
-#queue li { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 3px; cursor: pointer; }
-#queue li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#queue li:hover { background: var(--card); }
-#queue li.current { background: var(--active); font-weight: 600; }
-#queue li button { padding: 0 6px; border: 0; background: none; color: var(--muted); visibility: hidden; }
-#queue li:hover button { visibility: visible; }
-#queue li button:hover { color: var(--bad); }
+#queue > li.drop-target { box-shadow: 0 -2px 0 var(--accent); }
+.row { display: flex; align-items: center; gap: 2px; padding: 2px 4px; border-radius: 3px; cursor: pointer; }
+.row span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row:hover { background: var(--card); }
+#queue > li.current > .row { background: var(--active); font-weight: 600; }
+.row button { padding: 0 4px; border: 0; background: none; color: var(--muted); }
+.row .del { visibility: hidden; }
+.row:hover .del { visibility: visible; }
+.row .del:hover { color: var(--bad); }
+.chapters { list-style: none; margin: 0 0 4px; padding-left: 18px; font-size: 12px; }
+.chapters .row { gap: 6px; }
+.chapters time { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+#room { margin-top: 8px; }
+#room-open { width: 100%; }
+#room-panel { border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
+#room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#room-head strong { font-size: 15px; letter-spacing: 1px; }
+#room-close { margin-left: auto; }
+#room-players { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+#room-players li { display: flex; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 10px; }
+#room-players li b { font-variant-numeric: tabular-nums; }
+#room-players button, #chat button { padding: 0 5px; }
+#chat { height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 4px; background: var(--card); }
+#chat p { margin: 2px 0; overflow-wrap: anywhere; }
+#chat .system { color: var(--muted); font-style: italic; }
+#chat .private { color: var(--accent); }
+#chat .ref, #chat .tc { color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 10px; margin: 0 2px; }
+#chat-form { display: flex; gap: 4px; margin-top: 4px; }
+#chat-input { flex: 1; min-width: 0; }
 
 #blind-status { margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
 #blind-status strong { font-size: 15px; }

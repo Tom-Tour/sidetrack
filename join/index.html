@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sidetrack · Salon</title>
+  <!-- Versions à incrémenter à chaque modification (cache de GitHub Pages) -->
+  <link rel="stylesheet" href="join.css?v=1">
+</head>
+<body>
+  <main id="login">
+    <h1>Sidetrack</h1>
+    <p class="muted">Rejoins le salon pour écouter ou jouer au blind test ensemble.</p>
+    <form id="login-form">
+      <label>Code du salon <input id="code" type="text" maxlength="5" autocomplete="off" required></label>
+      <label>Ton pseudo <input id="name" type="text" maxlength="24" autocomplete="nickname" required></label>
+      <button type="submit">Rejoindre</button>
+    </form>
+    <p id="login-error" class="error" hidden></p>
+  </main>
+
+  <main id="room" hidden>
+    <header>
+      <strong>Salon <span id="room-code"></span></strong>
+      <span id="room-status" class="muted"></span>
+      <label class="volume" title="Volume">🔊 <input type="range" id="volume" min="0" max="100" value="100"></label>
+    </header>
+
+    <div id="layout">
+      <section id="stage">
+        <div id="player-wrap">
+          <div id="player"></div>
+          <div id="mask" hidden>
+            <div id="mask-icon">?</div>
+            <div id="mask-time"></div>
+          </div>
+        </div>
+        <div id="now"></div>
+        <div id="blind-status" hidden></div>
+        <button id="share-moment" title="Envoyer ce moment de la vidéo dans le chat">📍 Partager ce moment</button>
+        <section id="playlist">
+          <h2>Playlist de l'hôte <span class="muted">· clique pour proposer dans le chat</span></h2>
+          <ol id="queue"></ol>
+        </section>
+      </section>
+
+      <aside id="side">
+        <ul id="players"></ul>
+        <div id="chat"></div>
+        <form id="chat-form">
+          <input id="chat-input" type="text" placeholder="Écris ici (ta réponse en blind test)" autocomplete="off" maxlength="300">
+          <button type="submit">Envoyer</button>
+        </form>
+      </aside>
+    </div>
+  </main>
+
+  <script src="../vendor/peerjs.min.js"></script>
+  <script src="join.js?v=1"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>

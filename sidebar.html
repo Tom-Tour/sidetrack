@@ -20,6 +20,24 @@
     <button type="submit">Ajouter</button>
   </form>
 
+  <section id="room">
+    <button id="room-open">👥 Créer un salon</button>
+    <div id="room-panel" hidden>
+      <div id="room-head">
+        <span>Salon <strong id="room-code"></strong></span>
+        <span id="room-status" class="muted"></span>
+        <button id="room-copy" title="Copier le lien d'invitation">🔗 Copier le lien</button>
+        <button id="room-close" title="Fermer le salon">✕</button>
+      </div>
+      <ul id="room-players"></ul>
+      <div id="chat"></div>
+      <form id="chat-form">
+        <input id="chat-input" type="text" placeholder="Message au salon" autocomplete="off" maxlength="300">
+        <button type="submit">Envoyer</button>
+      </form>
+    </div>
+  </section>
+
   <div id="tabs">
     <button id="mode-listen" class="tab">🎧 Écoute</button>
     <button id="mode-blind" class="tab">❓ Blind test</button>

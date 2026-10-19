@@ -52,7 +52,7 @@ window.onYouTubeIframeAPIReady = () => {
         pending = null;
       },
       onStateChange: (e) => {
-        send({ type: "state", state: e.data });
+        send({ type: "state", state: e.data, ...position() });
         if (e.data === YT.PlayerState.PLAYING) onPlaying();
         if (e.data === YT.PlayerState.PAUSED) {
           if (Date.now() - unmutedAt < 2000) {
@@ -112,6 +112,11 @@ function sendPlaylist(attempt) {
   }
 }
 
+// Vidéo et position actuelles (pour synchroniser les invités d'un salon)
+function position() {
+  return { id: player.getVideoData()?.video_id, time: player.getCurrentTime() };
+}
+
 function run(cmd) {
   if (!player?.loadVideoById) {
     pending = cmd;
@@ -146,6 +151,9 @@ function run(cmd) {
       volume = cmd.value;
       if (!player.isMuted()) player.setVolume(volume);
       break;
+    case "seek":
+      player.seekTo(cmd.time, true);
+      break;
   }
 }
 
@@ -174,6 +182,7 @@ function shutDown() {
 setInterval(() => {
   if (!player?.getPlayerState || orphaned) return;
   const state = player.getPlayerState();
+  send({ type: "tick", state, ...position() });
 
   // Une lecture demandée qui reste bloquée au départ est relancée
   if (wantPlaying && unlock.hidden && (state === YT.PlayerState.UNSTARTED || state === YT.PlayerState.CUED)) {
