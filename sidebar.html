@@ -28,12 +28,14 @@
       <form id="room-form">
         <input id="room-name" type="text" data-i18n-placeholder="roomName" maxlength="24" autocomplete="off">
         <label data-i18n-title="publicRoom"><input type="checkbox" id="room-public"> <span data-i18n="public"></span></label>
-        <button type="submit" id="room-go"></button>
+        <!-- Les deux libellés sont superposés : le bouton garde la largeur du plus long -->
+        <button type="submit" id="room-go"><span data-i18n="create"></span><span data-i18n="join"></span></button>
       </form>
       <div id="rooms-row">
-        <ul id="public-list"></ul>
+        <span id="public-status" class="muted"></span>
         <button id="public-refresh" class="icon" data-i18n-title="refresh">↻</button>
       </div>
+      <ul id="public-list"></ul>
       <div id="room-panel" hidden>
             <div id="room-head">
               <span><span data-i18n="room"></span> <strong id="room-code"></strong> <span id="room-public-badge" data-i18n-title="publicBadge">🌐</span></span>

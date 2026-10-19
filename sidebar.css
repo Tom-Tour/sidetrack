@@ -70,14 +70,20 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .line { display: flex; align-items: center; gap: 4px; }
 .line input[type=text] { flex: 1; min-width: 0; }
 .line label { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+/* Mêmes espacements que le reste de la barre : 4px entre éléments, 6px entre lignes */
 #online { margin-top: 6px; }
-/* Ligne 1 : nom 50 %, Public 25 %, Créer/Rejoindre 25 % */
-#room-form { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 4px; align-items: center; }
-#room-form input[type=text] { min-width: 0; }
-#room-form label { display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; }
-/* Ligne 2 : salons publics + ↻ (aligné sous ⚙) */
-#rooms-row { display: flex; align-items: flex-start; gap: 4px; margin-top: 4px; }
-#public-list { flex: 1; min-width: 0; list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 120px; overflow-y: auto; }
+/* Ligne 1 : le nom prend la place restante, Public et le bouton juste ce qu'il leur faut */
+#room-form { display: flex; align-items: center; gap: 4px; }
+#room-form input[type=text] { flex: 1; min-width: 0; }
+#room-form label { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+#room-go { display: inline-grid; }
+#room-go > span { grid-area: 1 / 1; }
+#room-go > span.off { visibility: hidden; }
+/* Ligne 2 : explication de la liste, ↻ aligné sous ⚙ ; la liste en dessous */
+#rooms-row { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+#public-status { flex: 1; min-width: 0; }
+#public-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; max-height: 120px; overflow-y: auto; }
+#public-list:empty { display: none; }
 #public-list li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 3px; cursor: pointer; }
 #public-list li:hover { background: var(--card); }
 #public-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

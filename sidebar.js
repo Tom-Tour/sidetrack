@@ -231,7 +231,13 @@ function chatText(parent, text) {
 
 // Salons publics : un clic sur une ligne rejoint le salon
 function renderPublicRooms() {
-  $("#public-refresh").classList.toggle("on", view.rooms.loading);
+  const { list, loading, at } = view.rooms;
+  $("#public-refresh").classList.toggle("on", loading);
+  $("#public-status").textContent = loading
+    ? t("searching")
+    : at && !list.length
+      ? t("noRooms")
+      : t("roomsOpen", list.length);
   $("#public-list").replaceChildren(
     ...view.rooms.list.map((r) => {
       const li = el("li");
@@ -257,8 +263,12 @@ function renderRoom(blind) {
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
   $("#rooms-row").hidden = !!room;
+  $("#public-list").hidden = !!room;
   if (!room) {
-    $("#room-go").textContent = listedRoom() ? t("join") : t("create");
+    const joining = !!listedRoom();
+    const [createLabel, joinLabel] = $("#room-go").children;
+    createLabel.classList.toggle("off", joining);
+    joinLabel.classList.toggle("off", !joining);
     return renderPublicRooms();
   }
   if (room.code === roomName($("#room-name").value)) $("#room-name").value = "";

@@ -22,7 +22,7 @@ let state = {
   blind: { clip: 20, startMode: "random", hideVideo: true },
   volume: 100,
   lang: "auto",        // "auto" | "fr" | "en"
-  showMulti: false,    // onglet Salon (multijoueur), à activer dans les réglages
+  showMulti: true,     // bouton 🌐 du salon (désactivable dans les réglages pour un usage solo)
 };
 
 let playerState = -1;  // -1 non démarré, 0 fini, 1 lecture, 2 pause, 5 prête
