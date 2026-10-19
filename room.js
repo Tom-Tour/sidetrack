@@ -77,11 +77,12 @@ function openRoom({ isPublic = false, name = "" } = {}) {
   peer.on("error", (e) => {
     if (room?.peer !== peer) return;
     if (e.type === "unavailable-id") {
-      // Nom déjà utilisé par un autre salon ouvert
+      // Nom déjà pris : ce salon existe, on le rejoint (même champ pour créer ou rejoindre)
       peer.destroy();
       room = null;
-      notice = { key: "noticeNameTaken", args: [code] };
-      return update();
+      log(t("logJoinExisting", code));
+      update();
+      return joinRoom(code);
     }
     log(t("logRoomError", e.type));
     if (["network", "server-error", "socket-error", "browser-incompatible"].includes(e.type)) {

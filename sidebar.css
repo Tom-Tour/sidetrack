@@ -70,14 +70,18 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .line { display: flex; align-items: center; gap: 4px; }
 .line input[type=text] { flex: 1; min-width: 0; }
 .line label { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
-#online h3 { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
-#public-head { margin-top: 10px; }
-#public-head h3 { margin: 0; }
-#public-status { flex: 1; text-align: right; }
-#public-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; }
-#public-list li { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+#online { margin-top: 6px; }
+/* Ligne 1 : nom 50 %, Public 25 %, Créer/Rejoindre 25 % */
+#room-form { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 4px; align-items: center; }
+#room-form input[type=text] { min-width: 0; }
+#room-form label { display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; overflow: hidden; }
+/* Ligne 2 : salons publics + ↻ (aligné sous ⚙) */
+#rooms-row { display: flex; align-items: flex-start; gap: 4px; margin-top: 4px; }
+#public-list { flex: 1; min-width: 0; list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 120px; overflow-y: auto; }
+#public-list li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 3px; cursor: pointer; }
+#public-list li:hover { background: var(--card); }
 #public-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#room-panel { margin-top: 8px; }
+#room-panel { margin-top: 2px; }
 #room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #room-head strong { font-size: 15px; letter-spacing: 1px; }
 #room-head > span:first-child { flex: 1; }

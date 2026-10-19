@@ -13,6 +13,7 @@
       <button id="pl-rename" class="icon" data-i18n-title="rename">✎</button>
       <button id="pl-delete" class="icon" data-i18n-title="deletePlaylist">🗑</button>
       <button id="pl-export" class="icon" data-i18n-title="exportYoutube">⤴</button>
+      <button id="toggle-room" class="icon" data-i18n-title="room">🌐</button>
       <button id="open-settings" class="icon" data-i18n-title="settings">⚙</button>
     </div>
     <p id="notice" hidden></p>
@@ -22,10 +23,36 @@
       <button type="submit" data-i18n="add"></button>
     </form>
 
+    <!-- Salon (bouton 🌐) : créer ou rejoindre, salons publics ; une fois dedans, le chat -->
+    <section id="online" hidden>
+      <form id="room-form">
+        <input id="room-name" type="text" data-i18n-placeholder="roomName" maxlength="24" autocomplete="off">
+        <label data-i18n-title="publicRoom"><input type="checkbox" id="room-public"> <span data-i18n="public"></span></label>
+        <button type="submit" id="room-go"></button>
+      </form>
+      <div id="rooms-row">
+        <ul id="public-list"></ul>
+        <button id="public-refresh" class="icon" data-i18n-title="refresh">↻</button>
+      </div>
+      <div id="room-panel" hidden>
+            <div id="room-head">
+              <span><span data-i18n="room"></span> <strong id="room-code"></strong> <span id="room-public-badge" data-i18n-title="publicBadge">🌐</span></span>
+              <span id="room-status" class="muted"></span>
+              <button id="room-copy" data-i18n-title="copyLinkTitle"></button>
+              <button id="room-close" class="icon" data-i18n-title="closeRoom">✕</button>
+            </div>
+            <ul id="room-players"></ul>
+            <div id="chat"></div>
+            <form id="chat-form">
+              <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
+              <button type="submit" data-i18n="sendChat"></button>
+            </form>
+          </div>
+    </section>
+
     <div id="tabs">
       <button id="mode-listen" class="tab" data-i18n="modePlaylist"></button>
       <button id="mode-blind" class="tab" data-i18n="modeBlind"></button>
-      <button id="mode-online" class="tab" data-i18n="modeOnline"></button>
     </div>
 
     <div id="stage">
@@ -50,7 +77,6 @@
         <button id="next" data-i18n-title="next">⏭</button>
         <button id="shuffle" data-i18n-title="shuffle">🔀</button>
       </div>
-      <div id="room-slot-listen"></div>
       <ol id="queue"></ol>
       <p id="empty" class="muted" data-i18n="emptyPlaylist" hidden></p>
     </section>
@@ -58,7 +84,6 @@
     <section id="blind" hidden>
       <div id="blind-status"></div>
       <div id="blind-actions" class="controls"></div>
-      <div id="room-slot-blind"></div>
       <fieldset id="blind-settings">
         <label><span data-i18n="clipLength"></span>
           <select id="clip">
@@ -80,48 +105,7 @@
         <label><input type="checkbox" id="hideVideo"> <span data-i18n="hideVideo"></span></label>
       </fieldset>
     </section>
-
-    <!-- Onglet Salon : créer, rejoindre, salons publics ; puis le salon lui-même -->
-    <section id="online" hidden>
-      <div id="online-start">
-        <h3 data-i18n="createRoom"></h3>
-        <form id="create-form" class="line">
-          <input id="room-name" type="text" data-i18n-placeholder="roomName" maxlength="24" autocomplete="off">
-          <label data-i18n-title="publicRoom"><input type="checkbox" id="room-public"> <span data-i18n="public"></span></label>
-          <button type="submit" data-i18n="create"></button>
-        </form>
-        <h3 data-i18n="joinRoom"></h3>
-        <form id="join-form" class="line">
-          <input id="join-code" type="text" data-i18n-placeholder="joinName" maxlength="24" autocomplete="off">
-          <button type="submit" data-i18n="join"></button>
-        </form>
-        <div class="line" id="public-head">
-          <h3 data-i18n="publicRooms"></h3>
-          <span id="public-status" class="muted"></span>
-          <button id="public-refresh" class="icon" data-i18n-title="refresh">↻</button>
-        </div>
-        <ul id="public-list"></ul>
-      </div>
-      <div id="room-slot-online"></div>
-    </section>
   </main>
-
-  <!-- Panneau du salon ouvert : déplacé par sidebar.js dans l'onglet affiché -->
-  <div id="room-panel" hidden>
-        <div id="room-head">
-          <span><span data-i18n="room"></span> <strong id="room-code"></strong> <span id="room-public-badge" data-i18n-title="publicBadge">🌐</span></span>
-          <span id="room-status" class="muted"></span>
-          <button id="room-copy" data-i18n-title="copyLinkTitle"></button>
-          <button id="room-close" class="icon" data-i18n-title="closeRoom">✕</button>
-        </div>
-        <ul id="room-players"></ul>
-        <div id="chat"></div>
-        <form id="chat-form">
-          <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
-          <button type="submit" data-i18n="sendChat"></button>
-        </form>
-      </div>
-
 
   <main id="settings" hidden>
     <div class="line">

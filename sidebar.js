@@ -101,26 +101,16 @@ $("#close-settings").addEventListener("click", () => showSettings(false));
 $("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
 $("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
 
-// --- Onglets -----------------------------------------------------------------
-// Playlist et Blind test changent le mode du moteur ; Salon n'est qu'une vue.
+// --- Salon -------------------------------------------------------------------
 
-let tab = null; // null : suit le mode du moteur ; "online" : onglet Salon
-
-$("#mode-listen").addEventListener("click", () => {
-  tab = null;
-  act("setMode", "listen");
-});
-$("#mode-blind").addEventListener("click", () => {
-  tab = null;
-  act("setMode", "blind");
-});
-$("#mode-online").addEventListener("click", () => {
-  tab = "online";
-  act("refreshPublicRooms");
+// Bouton 🌐 : affiche les deux lignes du salon au-dessus des onglets
+let roomOpen = false;
+let hadRoom = false;
+$("#toggle-room").addEventListener("click", () => {
+  roomOpen = !roomOpen;
+  if (roomOpen) act("refreshPublicRooms");
   render();
 });
-
-// --- Salon -------------------------------------------------------------------
 
 // Même règle que room.js : minuscules, sans accents, espaces → tirets
 function roomName(text) {
@@ -140,18 +130,20 @@ function suggestName() {
 }
 $("#room-name").value = suggestName();
 
-$("#create-form").addEventListener("submit", (e) => {
+// Un seul bouton : « Rejoindre » si le nom est celui d'un salon public listé, sinon « Créer ».
+// Un nom de salon privé déjà ouvert fait aussi rejoindre (voir openRoom dans room.js).
+function listedRoom() {
+  const name = roomName($("#room-name").value);
+  return view?.rooms.list.find((r) => r.code === name);
+}
+
+$("#room-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = roomName($("#room-name").value) || suggestName();
-  act("openRoom", { name, isPublic: $("#room-public").checked });
+  if (listedRoom()) act("joinRoom", name);
+  else act("openRoom", { name, isPublic: $("#room-public").checked });
 });
-$("#join-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const name = roomName($("#join-code").value);
-  if (!name) return;
-  act("joinRoom", name);
-  $("#join-code").value = "";
-});
+$("#room-name").addEventListener("input", () => render());
 $("#public-refresh").addEventListener("click", () => act("refreshPublicRooms"));
 
 $("#room-close").addEventListener("click", () => act("closeRoom"));
@@ -237,35 +229,36 @@ function chatText(parent, text) {
   parent.append(text.slice(last));
 }
 
+// Salons publics : un clic sur une ligne rejoint le salon
 function renderPublicRooms() {
-  const { list, loading, at } = view.rooms;
-  $("#public-status").textContent = loading
-    ? t("searching")
-    : !at
-      ? ""
-      : list.length
-        ? t("roomsOpen", list.length)
-        : t("noRooms");
+  $("#public-refresh").classList.toggle("on", view.rooms.loading);
   $("#public-list").replaceChildren(
-    ...list.map((r) => {
+    ...view.rooms.list.map((r) => {
       const li = el("li");
-      li.appendChild(el("span", `${r.mode === "blind" ? "❓" : "🎵"} ${t("room")} ${r.code}`, "name"));
-      li.append(el("span", `${r.players} 👤`, "muted"), button(t("join"), () => act("joinRoom", r.code)));
+      li.title = t("join");
+      li.append(el("span", `${r.mode === "blind" ? "❓" : "🎵"} ${r.code}`, "name"), el("span", `${r.players} 👤`, "muted"));
+      li.addEventListener("click", () => act("joinRoom", r.code));
       return li;
     })
   );
 }
 
-function renderRoom(blind, shown) {
+function renderRoom(blind) {
   const room = view.room;
-  // Le panneau du salon suit l'onglet affiché : l'arbitre garde le chat sous les commandes du jeu
-  const slot = $(`#room-slot-${shown}`);
-  if ($("#room-panel").parentElement !== slot) slot.appendChild($("#room-panel"));
+  // Le salon s'affiche au-dessus des onglets : les deux lignes, ou le chat une fois dedans
+  // À l'ouverture d'un salon, le chat s'affiche ; 🌐 permet ensuite de le replier
+  if (room && !hadRoom) roomOpen = true;
+  // Après la fermeture, un nouveau nom est proposé (sinon le champ vide montre « Nom du salon »)
+  if (!room && hadRoom) $("#room-name").value = suggestName();
+  hadRoom = !!room;
+  $("#toggle-room").hidden = !view.state.showMulti && !room;
+  $("#toggle-room").classList.toggle("on", roomOpen);
+  $("#online").hidden = !roomOpen;
   $("#room-panel").hidden = !room;
-  $("#online-start").hidden = !!room;
+  $("#room-form").hidden = !!room;
+  $("#rooms-row").hidden = !!room;
   if (!room) {
-    // Nouveau nom proposé après la fermeture d'un salon
-    if (!$("#room-name").value && document.activeElement !== $("#room-name")) $("#room-name").value = suggestName();
+    $("#room-go").textContent = listedRoom() ? t("join") : t("create");
     return renderPublicRooms();
   }
   if (room.code === roomName($("#room-name").value)) $("#room-name").value = "";
@@ -452,17 +445,11 @@ function render() {
   const blind = state.mode === "blind";
   // Dans un salon, l'hôte est l'arbitre : il voit tout, même pendant une manche
   const secret = blind && !multi && ["playing", "timeup"].includes(game.phase);
-  // Onglet Salon : visible si activé dans les réglages (ou si un salon est ouvert)
-  const onlineAllowed = state.showMulti || multi;
-  if (tab === "online" && !onlineAllowed) tab = null;
-  const shown = tab ?? (blind ? "blind" : "listen"); // onglet affiché
-  $("#mode-online").hidden = !onlineAllowed;
-  for (const name of ["listen", "blind", "online"]) {
-    $(`#mode-${name}`).classList.toggle("on", shown === name);
-    $(`#${name}`).hidden = shown !== name;
-  }
-  $("#stage").hidden = shown === "online";
-  renderRoom(blind, shown);
+  $("#mode-listen").classList.toggle("on", !blind);
+  $("#mode-blind").classList.toggle("on", blind);
+  $("#listen").hidden = blind;
+  $("#blind").hidden = !blind;
+  renderRoom(blind);
 
   // Miniature du morceau (la vidéo est dans l'onglet masqué). En blind test solo, aperçu noir
   // sauf une fois la réponse révélée (ou pendant la manche si on ne masque pas la vidéo).
