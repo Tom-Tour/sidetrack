@@ -4,13 +4,17 @@
 //
 // L'hôte choisit les vidéos et arbitre : en blind test, les propositions tapées dans le
 // chat ne sont visibles que de lui pendant la manche, et c'est lui qui donne les points.
+//
+// Un salon public est en plus annoncé sur des relais Nostr publics (nostr-tools), d'où
+// la liste des salons disponibles. Annonces signées avec une clé jetable par salon,
+// renouvelées chaque minute et expirant d'elles-mêmes.
 
 const JOIN_URL = "https://tom-tour.github.io/sidetrack/join/";
 const ROOM_PREFIX = "sidetrack-room-";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CHAT_LIMIT = 200;
 
-// { code, link, status, peer, players: Map(peerId → { id, name, score, conn }), chat: [] }
+// { code, link, status, public, name, peer, players: Map(peerId → { id, name, score, conn }), chat: [] }
 let room = null;
 let chatSeq = 0;
 let lastPublic = "";
@@ -20,7 +24,7 @@ function makeCode() {
   return Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 }
 
-function openRoom() {
+function openRoom({ isPublic = false, name = "" } = {}) {
   if (room) return;
   log(
     `Création du salon : PeerJS ${typeof Peer === "function" ? "chargé" : "ABSENT"}, ` +
@@ -28,12 +32,22 @@ function openRoom() {
   );
   const code = makeCode();
   const peer = new Peer(ROOM_PREFIX + code);
-  room = { code, link: `${JOIN_URL}#${code}`, status: "opening", peer, players: new Map(), chat: [] };
+  room = {
+    code,
+    link: `${JOIN_URL}#${code}`,
+    status: "opening",
+    public: isPublic,
+    name: String(name).trim().slice(0, 40) || "Salon Sidetrack",
+    peer,
+    players: new Map(),
+    chat: [],
+  };
   lastPublic = "";
 
   peer.on("open", () => {
     room.status = "open";
-    log(`Salon ${code} ouvert`);
+    log(`Salon ${code} ouvert${room.public ? " (public)" : ""}`);
+    if (room.public) startAnnouncing();
     update();
   });
   peer.on("connection", acceptPlayer);
@@ -44,9 +58,10 @@ function openRoom() {
     if (room?.peer !== peer) return;
     if (e.type === "unavailable-id") {
       // Code déjà pris : on en tire un autre
+      const { public: isPublic, name } = room;
       peer.destroy();
       room = null;
-      return openRoom();
+      return openRoom({ isPublic, name });
     }
     log(`Salon : erreur ${e.type}`);
     if (["network", "server-error", "socket-error", "browser-incompatible"].includes(e.type)) {
@@ -68,6 +83,7 @@ function joinRoom(code) {
 
 function closeRoom() {
   if (!room) return;
+  if (room.public) stopAnnouncing();
   broadcast({ t: "closed" });
   const { peer } = room;
   room = null;
@@ -213,6 +229,7 @@ function publicState() {
 
 // Appelé à chaque mise à jour du moteur : n'envoie que si l'état visible a changé
 function roomUpdate() {
+  if (room?.public && room.status === "open") announceIfChanged();
   if (!room || !room.players.size) return;
   const pub = publicState();
   const json = JSON.stringify(pub);
@@ -241,7 +258,122 @@ function roomSnapshot() {
     code: room.code,
     link: room.link,
     status: room.status,
+    public: room.public,
+    name: room.name,
     players: [...room.players.values()].map(({ id, name, score }) => ({ id, name, score })),
     chat: room.chat,
   };
+}
+
+// --- Salons publics (Nostr) ----------------------------------------------------
+
+const NOSTR_RELAYS = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net", "wss://nostr.mom"];
+const ANNOUNCE_TAG = "sidetrack-room";
+const ANNOUNCE_EVERY = 60 * 1000;
+const ANNOUNCE_TTL = 180; // secondes : un salon qui ne s'annonce plus disparaît de la liste
+
+let nostrPool = null;
+let announceKey = null;
+let announceTimer = null;
+let lastAnnounced = "";
+let publicRooms = { list: [], loading: false, at: 0 };
+
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+
+function pool() {
+  return (nostrPool ??= new NostrTools.SimplePool());
+}
+
+function publishAnnouncement(content, ttl) {
+  const created = nowSeconds();
+  const event = NostrTools.finalizeEvent(
+    {
+      kind: 30078, // données d'application, remplaçables (une annonce par clé)
+      created_at: created,
+      tags: [["d", ANNOUNCE_TAG], ["t", ANNOUNCE_TAG], ["expiration", String(created + ttl)]],
+      content: JSON.stringify({ v: 1, ...content }),
+    },
+    announceKey
+  );
+  Promise.allSettled(pool().publish(NOSTR_RELAYS, event)).then((results) => {
+    if (!results.some((r) => r.status === "fulfilled")) log("✗ Annonce du salon : aucun relais n'a répondu");
+  });
+}
+
+function announcement() {
+  return { code: room.code, name: room.name, players: room.players.size, mode: state.mode };
+}
+
+function announce() {
+  if (!room?.public) return;
+  const content = announcement();
+  lastAnnounced = JSON.stringify(content);
+  publishAnnouncement(content, ANNOUNCE_TTL);
+}
+
+// Nombre de joueurs ou mode changé : on met l'annonce à jour sans attendre la minute
+function announceIfChanged() {
+  if (JSON.stringify(announcement()) !== lastAnnounced) announce();
+}
+
+function startAnnouncing() {
+  announceKey = NostrTools.generateSecretKey(); // clé jetable : rien ne relie deux salons
+  announce();
+  announceTimer = setInterval(announce, ANNOUNCE_EVERY);
+}
+
+function stopAnnouncing() {
+  clearInterval(announceTimer);
+  announceTimer = null;
+  lastAnnounced = "";
+  publishAnnouncement({ closed: true }, 30); // remplace l'annonce : le salon sort de la liste
+}
+
+async function refreshPublicRooms() {
+  if (publicRooms.loading) return;
+  publicRooms.loading = true;
+  update();
+  try {
+    const now = nowSeconds();
+    const events = await pool().querySync(
+      NOSTR_RELAYS,
+      { kinds: [30078], "#t": [ANNOUNCE_TAG], since: now - ANNOUNCE_TTL },
+      { maxWait: 4000 }
+    );
+    // Dernière annonce de chaque salon (une clé par salon)
+    const latest = new Map();
+    for (const e of events) {
+      if (!latest.has(e.pubkey) || e.created_at > latest.get(e.pubkey).created_at) latest.set(e.pubkey, e);
+    }
+    const list = [];
+    for (const e of latest.values()) {
+      const expiration = Number(e.tags.find((t) => t[0] === "expiration")?.[1] ?? 0);
+      if (expiration && expiration < now) continue;
+      let c;
+      try {
+        c = JSON.parse(e.content);
+      } catch {
+        continue;
+      }
+      if (c.closed || typeof c.code !== "string" || !/^[A-Z0-9]{5}$/.test(c.code)) continue;
+      if (c.code === room?.code) continue; // notre propre salon
+      list.push({
+        code: c.code,
+        name: String(c.name ?? "").slice(0, 40) || "Salon",
+        players: Math.max(0, Number(c.players) || 0),
+        mode: c.mode === "blind" ? "blind" : "listen",
+        at: e.created_at,
+      });
+    }
+    publicRooms.list = list.sort((a, b) => b.at - a.at);
+    publicRooms.at = Date.now();
+  } catch (e) {
+    log(`✗ Liste des salons : ${e.message}`);
+  }
+  publicRooms.loading = false;
+  update();
+}
+
+function publicRoomsSnapshot() {
+  return publicRooms;
 }

@@ -48,7 +48,7 @@ const ports = new Set();
 let updateScheduled = null;
 
 function snapshot() {
-  return { state, game, playerState, notice, log: logLines, room: roomSnapshot() };
+  return { state, game, playerState, notice, log: logLines, room: roomSnapshot(), rooms: publicRoomsSnapshot() };
 }
 
 // Regroupe les mises à jour (un import de playlist en déclenche des centaines)
@@ -624,7 +624,8 @@ const actions = {
     else play(i, { start: ref.start ?? 0 });
   },
   // Fonctions de room.js, chargé après ce fichier : on ne les référence qu'à l'appel
-  openRoom: () => openRoom(),
+  openRoom: (options) => openRoom(options),
+  refreshPublicRooms: () => refreshPublicRooms(),
   closeRoom: () => closeRoom(),
   joinRoom: (code) => joinRoom(code),
   hostChat: (text) => hostChat(text),

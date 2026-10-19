@@ -22,15 +22,27 @@
 
   <section id="room">
     <div id="room-start">
-      <button id="room-open">👥 Créer un salon</button>
-      <form id="room-join">
+      <div class="line">
+        <button id="room-open">👥 Créer un salon</button>
+        <label title="Le salon apparaît dans la liste des salons publics"><input type="checkbox" id="room-public"> Public</label>
+      </div>
+      <input id="room-name" type="text" placeholder="Nom du salon public" maxlength="40" autocomplete="off" hidden>
+      <form id="room-join" class="line">
         <input id="join-code" type="text" placeholder="Code d'un salon" maxlength="5" autocomplete="off">
         <button type="submit">Rejoindre</button>
       </form>
+      <details id="public-rooms">
+        <summary>🌐 Salons publics</summary>
+        <div class="line">
+          <span id="public-status" class="muted"></span>
+          <button id="public-refresh" title="Actualiser">↻</button>
+        </div>
+        <ul id="public-list"></ul>
+      </details>
     </div>
     <div id="room-panel" hidden>
       <div id="room-head">
-        <span>Salon <strong id="room-code"></strong></span>
+        <span>Salon <strong id="room-code"></strong> <span id="room-public-badge" title="Visible dans la liste des salons publics">🌐</span></span>
         <span id="room-status" class="muted"></span>
         <button id="room-copy" title="Copier le lien d'invitation">🔗 Copier le lien</button>
         <button id="room-close" title="Fermer le salon">✕</button>

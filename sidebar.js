@@ -83,7 +83,19 @@ $("#add").addEventListener("submit", (e) => {
 
 // --- Salon -----------------------------------------------------------------
 
-$("#room-open").addEventListener("click", () => act("openRoom"));
+$("#room-open").addEventListener("click", () => {
+  const isPublic = $("#room-public").checked;
+  act("openRoom", { isPublic, name: isPublic ? $("#room-name").value : "" });
+});
+$("#room-public").addEventListener("change", (e) => {
+  $("#room-name").hidden = !e.target.checked;
+  if (e.target.checked) $("#room-name").focus();
+});
+// La liste se charge à l'ouverture de la section, puis à la demande
+$("#public-rooms").addEventListener("toggle", (e) => {
+  if (e.target.open) act("refreshPublicRooms");
+});
+$("#public-refresh").addEventListener("click", () => act("refreshPublicRooms"));
 $("#room-join").addEventListener("submit", (e) => {
   e.preventDefault();
   const code = $("#join-code").value.trim().toUpperCase();
@@ -175,13 +187,34 @@ function chatText(parent, text) {
   parent.append(text.slice(last));
 }
 
+function renderPublicRooms() {
+  const { list, loading, at } = view.rooms;
+  $("#public-status").textContent = loading
+    ? "Recherche…"
+    : !at
+      ? ""
+      : list.length
+        ? `${list.length} salon(s) ouvert(s)`
+        : "Aucun salon public pour l'instant";
+  $("#public-list").replaceChildren(
+    ...list.map((r) => {
+      const li = el("li");
+      const name = li.appendChild(el("span", `${r.mode === "blind" ? "❓" : "🎧"} ${r.name}`, "name"));
+      name.title = `${r.name} (${r.code})`;
+      li.append(el("span", `${r.players} 👤`, "muted"), button("Rejoindre", () => act("joinRoom", r.code)));
+      return li;
+    })
+  );
+}
+
 function renderRoom(blind) {
   const room = view.room;
   $("#room-start").hidden = !!room;
   $("#room-panel").hidden = !room;
-  if (!room) return;
+  if (!room) return renderPublicRooms();
 
   $("#room-code").textContent = room.code;
+  $("#room-public-badge").hidden = !room.public;
   $("#room-status").textContent =
     room.status === "opening" ? "ouverture…" : room.status === "error" ? "⚠ connexion impossible" : `${room.players.length} invité(s)`;
 
