@@ -8,6 +8,7 @@
   },
   "permissions": [
     "storage",
+    "tabHide",
     "https://www.youtube.com/oembed*",
     "https://tom-tour.github.io/*"
   ],

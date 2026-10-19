@@ -87,6 +87,7 @@ $("#prev").addEventListener("click", () => act("prev"));
 $("#next").addEventListener("click", () => act("next"));
 $("#toggle").addEventListener("click", () => act("toggle"));
 $("#shuffle").addEventListener("click", () => act("toggleShuffle"));
+$("#show-player").addEventListener("click", () => act("focusPlayer"));
 $("#mode-listen").addEventListener("click", () => act("setMode", "listen"));
 $("#mode-blind").addEventListener("click", () => act("setMode", "blind"));
 

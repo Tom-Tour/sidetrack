@@ -1,5 +1,5 @@
 // Page hébergée sur une vraie origine https : YouTube accepte d'y intégrer son lecteur.
-// L'extension l'ouvre dans un onglet épinglé et la pilote par postMessage,
+// L'extension l'ouvre dans un onglet masqué et la pilote par postMessage,
 // relayé par son script de contenu (player-bridge.js).
 let player = null;
 let pending = null;

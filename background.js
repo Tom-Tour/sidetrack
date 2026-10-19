@@ -2,8 +2,9 @@
 // Tourne en arrière-plan pour que la musique continue barre latérale fermée.
 // La barre latérale n'est qu'une télécommande reliée par un port.
 //
-// Le lecteur vit dans un onglet épinglé : Firefox n'autorise le son que dans une page
+// Le lecteur vit dans un onglet masqué : Firefox n'autorise le son que dans une page
 // qui a reçu un clic, ce qui est impossible pour un lecteur caché en arrière-plan.
+// L'onglet s'affiche le temps de ce clic, puis disparaît de la barre d'onglets.
 
 // Page du lecteur (dossier player/), hébergée sur GitHub Pages.
 const PLAYER_URL = "https://tom-tour.github.io/sidetrack/player/index.html";
@@ -217,14 +218,22 @@ async function openPlayerTab() {
   const [tab] = await browser.tabs.query({ url: "https://tom-tour.github.io/sidetrack/player/*" });
   if (tab) await browser.tabs.remove(tab.id);
   // Paramètre anti-cache : GitHub Pages garde les fichiers jusqu'à 10 minutes
-  browser.tabs.create({ url: `${PLAYER_URL}?t=${Date.now()}`, pinned: true, active: true });
+  browser.tabs.create({ url: `${PLAYER_URL}?t=${Date.now()}`, active: true });
 }
 
 // Revient à l'onglet où l'on naviguait avant l'ouverture du lecteur
+// (l'onglet du lecteur se masque alors via onActivated)
 function backToBrowsing() {
   if (returnTabId != null) browser.tabs.update(returnTabId, { active: true }).catch(() => {});
   returnTabId = null;
 }
+
+// L'onglet du lecteur n'est visible que tant qu'on est dessus
+browser.tabs.onActivated.addListener(({ previousTabId }) => {
+  if (previousTabId != null && previousTabId === playerTabId) {
+    browser.tabs.hide(playerTabId).catch((e) => log(`Impossible de masquer l'onglet : ${e.message}`));
+  }
+});
 
 function connectPlayer(port) {
   // Firefox réinjecte le pont dans les onglets déjà ouverts quand l'extension est rechargée :
@@ -251,8 +260,12 @@ function connectPlayer(port) {
   queued = [];
 }
 
-function focusPlayer() {
-  if (playerTabId != null) browser.tabs.update(playerTabId, { active: true });
+async function focusPlayer() {
+  if (playerTabId == null || !playerPort) return;
+  const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (active?.id === playerTabId) return;
+  await browser.tabs.show(playerTabId);
+  browser.tabs.update(playerTabId, { active: true });
 }
 
 function play(i, opts = {}) {
@@ -276,7 +289,7 @@ function onPlayerMessage(msg) {
       } else {
         notice = {
           text:
-            "Clique sur « Activer le son » dans l'onglet Sidetrack épinglé (une fois par session). " +
+            "Clique sur « Activer le son » dans l'onglet Sidetrack (une fois par session). " +
             "Pour ne plus avoir à le faire : dans cet onglet, cadenas de la barre d'adresse → " +
             "Lecture automatique → Autoriser l'audio et la vidéo.",
           focus: true,
@@ -288,7 +301,7 @@ function onPlayerMessage(msg) {
       log("🔇 Son bloqué par Firefox");
       notice = {
         text:
-          "Firefox bloque le son tant que tu n'as pas cliqué dans l'onglet Sidetrack épinglé. " +
+          "Firefox bloque le son tant que tu n'as pas cliqué dans l'onglet Sidetrack. " +
           "Clique sur « Activer le son » dans cet onglet. Pour ne plus jamais avoir à le faire : " +
           "dans cet onglet, cadenas de la barre d'adresse → Lecture automatique → Autoriser l'audio et la vidéo.",
         focus: true,
