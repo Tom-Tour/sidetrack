@@ -4,14 +4,16 @@ A Firefox extension to build local playlists from YouTube links and play them in
 
 *Extension Firefox : crée des playlists locales à partir de liens YouTube et écoute-les dans la barre latérale pendant que tu navigues.*
 
-> Early prototype. Planned: named playlists, blind-test mode, export to YouTube, multiplayer rooms.
+> Early version. Planned: export to YouTube, multiplayer rooms.
 
 ## Features
 
+- Named local playlists: create, rename, delete, switch
 - Add a YouTube video or a whole playlist by pasting its link
 - Plays in the Firefox sidebar, keeps playing while you switch tabs
 - Auto-advance and shuffle
-- Your queue is stored locally in Firefox
+- **Blind-test mode**: random order without repeats, hidden video, random start point, timed clips (10–30 s), reveal and score
+- Everything is stored locally in Firefox
 
 ## Try it
 

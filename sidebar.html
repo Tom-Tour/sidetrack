@@ -5,25 +5,63 @@
   <link rel="stylesheet" href="sidebar.css">
 </head>
 <body>
+  <div id="pl-bar">
+    <select id="pl-select" title="Playlist"></select>
+    <input id="pl-name" type="text" placeholder="Nom de la playlist" autocomplete="off" hidden>
+    <button id="pl-new" title="Nouvelle playlist">＋</button>
+    <button id="pl-rename" title="Renommer">✎</button>
+    <button id="pl-delete" title="Supprimer la playlist">🗑</button>
+  </div>
+
   <form id="add">
     <input id="url" type="text" placeholder="Lien YouTube (vidéo ou playlist)" autocomplete="off">
     <button type="submit">Ajouter</button>
   </form>
 
-  <div id="player-wrap"><iframe id="player" allow="autoplay; encrypted-media; fullscreen"></iframe></div>
-  <div id="now">Rien en lecture</div>
-
-  <div id="controls">
-    <button id="prev" title="Précédent">⏮</button>
-    <button id="toggle" title="Lecture / pause">⏯</button>
-    <button id="next" title="Suivant">⏭</button>
-    <button id="shuffle" title="Aléatoire">🔀</button>
-    <button id="clear" title="Vider la file">🗑</button>
+  <div id="tabs">
+    <button id="mode-listen" class="tab">🎧 Écoute</button>
+    <button id="mode-blind" class="tab">❓ Blind test</button>
   </div>
 
-  <ol id="queue"></ol>
+  <div id="player-wrap">
+    <iframe id="player" allow="autoplay; encrypted-media; fullscreen"></iframe>
+    <div id="mask" hidden>
+      <div id="mask-icon">?</div>
+      <div id="mask-time"></div>
+    </div>
+  </div>
+  <div id="now">Rien en lecture</div>
 
-  <details open>
+  <section id="listen">
+    <div class="controls">
+      <button id="prev" title="Précédent">⏮</button>
+      <button id="toggle" title="Lecture / pause">⏯</button>
+      <button id="next" title="Suivant">⏭</button>
+      <button id="shuffle" title="Aléatoire">🔀</button>
+    </div>
+    <ol id="queue"></ol>
+    <p id="empty" class="muted" hidden>Playlist vide : colle un lien YouTube ci-dessus.</p>
+  </section>
+
+  <section id="blind" hidden>
+    <div id="blind-status"></div>
+    <div id="blind-actions" class="controls"></div>
+    <fieldset id="blind-settings">
+      <label>Durée de l'extrait
+        <select id="clip">
+          <option value="10">10 s</option>
+          <option value="15">15 s</option>
+          <option value="20">20 s</option>
+          <option value="30">30 s</option>
+          <option value="0">Morceau entier</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="randomStart"> Départ à un moment aléatoire</label>
+      <label><input type="checkbox" id="hideVideo"> Masquer la vidéo</label>
+    </fieldset>
+  </section>
+
+  <details>
     <summary>Journal</summary>
     <pre id="log"></pre>
   </details>
