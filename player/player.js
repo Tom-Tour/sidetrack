@@ -1,14 +1,25 @@
 // Page hébergée sur une vraie origine https : YouTube accepte d'y intégrer son lecteur.
-// L'extension l'affiche dans une iframe et la pilote par postMessage.
+// L'extension l'ouvre dans un onglet épinglé et la pilote par postMessage,
+// relayé par son script de contenu (player-bridge.js).
 let player = null;
 let pending = null;
 let importingPlaylist = false;
 let randomStart = null;  // { clip } : sauter à un moment aléatoire avant d'annoncer le départ
 let announced = false;
+let unmutedAt = 0;       // Firefox met en pause un lecteur qui reprend le son sans clic préalable
+
+const unlock = document.getElementById("unlock");
 
 function send(msg) {
-  parent.postMessage({ sidetrack: true, ...msg }, "*");
+  window.postMessage({ sidetrack: true, ...msg }, location.origin);
 }
+
+unlock.addEventListener("click", () => {
+  unlock.hidden = true;
+  player.unMute();
+  player.playVideo();
+  send({ type: "unblocked" });
+});
 
 window.onYouTubeIframeAPIReady = () => {
   player = new YT.Player("player", {
@@ -24,6 +35,10 @@ window.onYouTubeIframeAPIReady = () => {
       onStateChange: (e) => {
         send({ type: "state", state: e.data });
         if (e.data === YT.PlayerState.PLAYING) onPlaying();
+        if (e.data === YT.PlayerState.PAUSED && Date.now() - unmutedAt < 2000) {
+          unlock.hidden = false;
+          send({ type: "blocked" });
+        }
         if (importingPlaylist && e.data === YT.PlayerState.CUED) sendPlaylist(0);
       },
       onError: (e) => send({ type: "error", code: e.data }),
@@ -47,12 +62,9 @@ function onPlaying() {
     }
   }
   announced = true;
+  unmutedAt = Date.now();
   player.unMute();
   send({ type: "started" });
-  // Diagnostic : Firefox peut bloquer le son d'un lecteur qui n'a reçu aucun clic.
-  setTimeout(() => {
-    send({ type: "debug", muted: player.isMuted(), state: player.getPlayerState(), volume: player.getVolume() });
-  }, 1000);
 }
 
 function waitPlaying(attempt) {
@@ -93,15 +105,18 @@ function run(cmd) {
       player.cuePlaylist({ listType: "playlist", list: cmd.list });
       break;
     case "play":
+      unmutedAt = 0;
       player.playVideo();
       break;
     case "pause":
+      unmutedAt = 0;
       player.pauseVideo();
       break;
   }
 }
 
 window.addEventListener("message", (e) => {
-  if (e.source !== parent || !e.data?.sidetrack) return;
+  // On ignore nos propres messages sortants (ils ont un "type", pas d'"action")
+  if (e.source !== window || !e.data?.sidetrack || !e.data.action) return;
   run(e.data);
 });
