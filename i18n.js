@@ -107,9 +107,9 @@ const STRINGS = {
     noticeExportedParts:
       "Playlist ouverte sur YouTube en {0} parties (50 vidéos max par partie). Pour la garder : dans le panneau de la playlist, ouvre le menu ⋮ puis « Tout ajouter à… » et choisis ou crée une playlist de ton compte.",
     noticeUnlock:
-      "Clique sur « Lancer Sidetrack » dans l'onglet Sidetrack (une fois par session). Pour ne plus avoir à le faire : dans cet onglet, cadenas de la barre d'adresse → Lecture automatique → Autoriser l'audio et la vidéo.",
+      "Clique sur « Lancer Sidetrack » dans l'onglet Sidetrack (une fois par session).",
     noticeBlocked:
-      "Firefox bloque le son tant que tu n'as pas cliqué dans l'onglet Sidetrack. Clique sur « Lancer Sidetrack » dans cet onglet. Pour ne plus jamais avoir à le faire : dans cet onglet, cadenas de la barre d'adresse → Lecture automatique → Autoriser l'audio et la vidéo.",
+      "Firefox bloque le son tant que tu n'as pas cliqué dans l'onglet Sidetrack : clique sur « Lancer Sidetrack » dans cet onglet.",
     noticePrivatePlaylist:
       "Impossible de lire cette playlist. Elle est sûrement privée (ou c'est « À regarder plus tard », « J'aime » ou un Mix) : le lecteur intégré ne voit pas ton compte YouTube. Passe-la en « Non répertoriée » sur YouTube puis réessaie.",
     logCommandError: "✗ Erreur ({0}) : {1}",
@@ -311,9 +311,9 @@ const STRINGS = {
     noticeExportedParts:
       "Playlist opened on YouTube in {0} parts (50 videos max each). To keep it: in the playlist panel, open the ⋮ menu, then “Add all to…” and pick or create a playlist in your account.",
     noticeUnlock:
-      "Click “Launch Sidetrack” in the Sidetrack tab (once per session). To never have to: in that tab, padlock in the address bar → Autoplay → Allow Audio and Video.",
+      "Click “Launch Sidetrack” in the Sidetrack tab (once per session).",
     noticeBlocked:
-      "Firefox blocks the sound until you click in the Sidetrack tab. Click “Launch Sidetrack” there. To never have to again: in that tab, padlock in the address bar → Autoplay → Allow Audio and Video.",
+      "Firefox blocks the sound until you click in the Sidetrack tab: click “Launch Sidetrack” there.",
     noticePrivatePlaylist:
       "This playlist can't be read. It's probably private (or it's Watch Later, Liked videos or a Mix): the embedded player doesn't see your YouTube account. Make it “Unlisted” on YouTube and try again.",
     logCommandError: "✗ Error ({0}): {1}",

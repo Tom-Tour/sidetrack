@@ -26,7 +26,7 @@ A Firefox extension to build local playlists from YouTube links and play them in
 1. Open `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on…** and pick `manifest.json`
 3. Toggle the sidebar with `Alt+Shift+Y`
-4. The first time you open it in a Firefox session, a Sidetrack tab shows up: click **Launch Sidetrack** (Firefox only allows sound after a click in the page). The tab then hides itself and stays ready until Firefox closes. To skip this step for good, allow autoplay for that tab (padlock in the address bar → Autoplay → Allow Audio and Video)
+4. The first time you open it in a Firefox session, a Sidetrack tab shows up: click **Launch Sidetrack** (Firefox only allows sound after a click in the page). The tab then hides itself and stays ready until Firefox closes. To skip this step for good, allow autoplay for `tom-tour.github.io` (Settings → Privacy & Security → Permissions → Autoplay → Settings…)
 
 ## How it works
 

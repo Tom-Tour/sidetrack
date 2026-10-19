@@ -26,23 +26,20 @@ const cover = document.getElementById("cover");
 const TEXT = navigator.language.toLowerCase().startsWith("fr")
   ? {
       title: "Sidetrack est presque prêt",
-      click: "Clique sur « Lancer Sidetrack » : Firefox n'autorise le son qu'après un clic dans la page. Cet onglet se range ensuite tout seul et reste prêt jusqu'à la fermeture de Firefox.",
-      autoplay: "Facultatif, pour ne plus voir cet écran : Firefox ne le propose pas de lui-même, c'est un réglage à ajouter une fois. Paramètres → Vie privée et sécurité → Permissions → Lecture automatique → Paramètres… → saisis tom-tour.github.io, choisis « Autoriser l'audio et la vidéo », puis Enregistrer.",
-      hide: "Firefox peut ensuite demander une autorisation : « Une extension masque certains de vos onglets ». Clique sur « Garder les onglets masqués » : c'est ce qui permet à Sidetrack de ranger proprement cet onglet hors de la barre d'onglets (il reste accessible avec 📺 dans le panneau). Tu peux aussi le laisser visible dans les réglages de Sidetrack.",
+      click: "Clique sur « Lancer Sidetrack » : Firefox n'active le son qu'après un clic. L'onglet se range ensuite tout seul.",
+      hide: "Une petite bulle peut s'afficher en haut à droite de Firefox (« Une extension masque certains de vos onglets ») : clique sur « Garder les onglets masqués ». Tu retrouves l'onglet avec 📺 dans le panneau.",
       unlock: "🔊 Lancer Sidetrack",
       orphan: "Sidetrack n'est plus actif : tu peux fermer cet onglet.",
     }
   : {
       title: "Sidetrack is almost ready",
-      click: "Click “Launch Sidetrack”: Firefox only allows sound after a click in the page. This tab then tucks itself away and stays ready until Firefox closes.",
-      autoplay: "Optional, to stop seeing this screen: Firefox never offers it on its own, it's a setting to add once. Settings → Privacy & Security → Permissions → Autoplay → Settings… → type tom-tour.github.io, choose “Allow Audio and Video”, then Save Changes.",
-      hide: "Firefox may then ask for permission: “An extension is hiding some of your tabs”. Click “Keep Tabs Hidden”: that lets Sidetrack tuck this tab neatly out of the tab bar (it stays reachable with 📺 in the sidebar). You can also keep it visible in Sidetrack's settings.",
+      click: "Click “Launch Sidetrack”: Firefox only turns the sound on after a click. The tab then tucks itself away.",
+      hide: "A small bubble may show up at the top right of Firefox (“An extension is hiding some of your tabs”): click “Keep Tabs Hidden”. You can get the tab back with 📺 in the sidebar.",
       unlock: "🔊 Launch Sidetrack",
       orphan: "Sidetrack is no longer active: you can close this tab.",
     };
 document.getElementById("setup-title").textContent = TEXT.title;
 document.getElementById("step-click").textContent = TEXT.click;
-document.getElementById("step-autoplay").textContent = TEXT.autoplay;
 document.getElementById("step-hide").textContent = TEXT.hide;
 unlock.querySelector("button").textContent = TEXT.unlock;
 
@@ -59,7 +56,8 @@ function unMute() {
   player.setVolume(audible(volume));
 }
 
-unlock.addEventListener("click", () => {
+// Seul le bouton ferme l'écran : un clic à côté ne fait rien
+unlock.querySelector("button").addEventListener("click", () => {
   unlock.hidden = true;
   if (player?.playVideo) {
     unMute();
