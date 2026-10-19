@@ -397,6 +397,9 @@ function onPlayerMessage(msg) {
       }
       break;
     case "blocked":
+      // On reste sur l'onglet : c'est là qu'il faut cliquer
+      clearTimeout(returnAfterStart);
+      returnAfterStart = null;
       log(t("logBlocked"));
       notice = { key: "noticeBlocked", focus: true };
       update();
@@ -419,10 +422,15 @@ function onPlayerMessage(msg) {
       update();
       break;
     case "started":
+      // Le son revient juste au démarrage, et Firefox peut encore couper la lecture pendant
+      // ~2 s : quitter l'onglet tout de suite faisait échouer le tout premier morceau.
+      // En blind test, le saut à un moment aléatoire retardait le départ, d'où la différence.
       if (returnAfterStart) {
         clearTimeout(returnAfterStart);
-        returnAfterStart = null;
-        backToBrowsing();
+        returnAfterStart = setTimeout(() => {
+          returnAfterStart = null;
+          backToBrowsing();
+        }, 2500);
       }
       if (state.mode === "blind" && game.phase === "playing") {
         // Dernier chapitre en « durée du chapitre » : sa fin dépend de la durée de la vidéo
