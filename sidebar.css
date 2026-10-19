@@ -75,10 +75,7 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 /* Ligne 1 : le nom prend la place restante, Public et le bouton juste ce qu'il leur faut */
 #room-form { display: flex; align-items: center; gap: 4px; }
 #room-form input[type=text] { flex: 1; min-width: 0; }
-#room-form label { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
-#room-go { display: inline-grid; }
-#room-go > span { grid-area: 1 / 1; }
-#room-go > span.off { visibility: hidden; }
+#room-form label { display: flex; align-items: center; gap: 3px; padding: 0 6px; white-space: nowrap; }
 /* Ligne 2 : explication de la liste, ↻ aligné sous ⚙ ; la liste en dessous */
 #rooms-row { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
 #public-status { flex: 1; min-width: 0; }

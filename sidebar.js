@@ -265,10 +265,7 @@ function renderRoom(blind) {
   $("#rooms-row").hidden = !!room;
   $("#public-list").hidden = !!room;
   if (!room) {
-    const joining = !!listedRoom();
-    const [createLabel, joinLabel] = $("#room-go").children;
-    createLabel.classList.toggle("off", joining);
-    joinLabel.classList.toggle("off", !joining);
+    $("#room-go").textContent = listedRoom() ? t("join") : t("create");
     return renderPublicRooms();
   }
   if (room.code === roomName($("#room-name").value)) $("#room-name").value = "";
