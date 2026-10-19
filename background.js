@@ -25,7 +25,6 @@ let playerState = -1;  // -1 non démarré, 0 fini, 1 lecture, 2 pause, 5 prête
 let importTarget = null;
 let notice = null;
 let logLines = [];
-let lastTick = null;   // position de lecture, pour la copie muette de la barre latérale
 
 // Partie de blind test en cours (non sauvegardée)
 let game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0 };
@@ -67,7 +66,6 @@ browser.runtime.onConnect.addListener((port) => {
   port.onDisconnect.addListener(() => ports.delete(port));
   port.onMessage.addListener(({ cmd, args = [] }) => actions[cmd]?.(...args));
   port.postMessage(snapshot());
-  port.postMessage({ tick: lastTick });
 });
 
 // --- Playlists -------------------------------------------------------------
@@ -262,8 +260,6 @@ function connectPlayer(port) {
     if (playerPort !== port) return;
     playerPort = null;
     playerState = -1;
-    lastTick = null;
-    for (const p of ports) p.postMessage({ tick: null });
     log("Onglet du lecteur fermé");
     update();
   });
@@ -297,10 +293,6 @@ function onPlayerMessage(msg) {
   switch (msg.type) {
     case "ready":
       log("✓ Lecteur prêt");
-      break;
-    case "tick":
-      lastTick = msg;
-      for (const p of ports) p.postMessage({ tick: msg });
       break;
     case "log":
       log(msg.text);
