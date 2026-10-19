@@ -20,6 +20,7 @@ let retried = false;     // une seule nouvelle tentative par chargement
 let stallRestarts = 0;
 
 const unlock = document.getElementById("unlock");
+const cover = document.getElementById("cover");
 
 // Les deux seuls textes de la page, dans la langue du navigateur
 const TEXT = navigator.language.toLowerCase().startsWith("fr")
@@ -189,6 +190,11 @@ window.addEventListener("message", (e) => {
     return;
   }
   if (e.data.action === "orphan") return shutDown();
+  // Fonctionne même avant que le lecteur YouTube soit prêt
+  if (e.data.action === "cover") {
+    cover.hidden = !e.data.on;
+    return;
+  }
   run(e.data);
 });
 

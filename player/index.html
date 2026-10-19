@@ -11,7 +11,12 @@
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       background: rgba(0, 0, 0, 0.85);
     }
-    #unlock[hidden] { display: none; }
+    #unlock[hidden], #cover[hidden] { display: none; }
+    /* Blind test : la vidéo reste cachée même si l'onglet est affiché (sous le bouton du son) */
+    #cover {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: #111; color: #fff; font-size: 96px; font-weight: 700;
+    }
     #unlock button {
       font: inherit; font-size: 20px; padding: 16px 28px; cursor: pointer;
       color: #fff; background: #0061e0; border: 0; border-radius: 8px;
@@ -20,9 +25,10 @@
 </head>
 <body>
   <div id="player"></div>
+  <div id="cover" hidden>?</div>
   <div id="unlock" hidden><button></button></div>
   <!-- Version à incrémenter à chaque modification de player.js (cache de GitHub Pages) -->
-  <script src="player.js?v=10"></script>
+  <script src="player.js?v=11"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

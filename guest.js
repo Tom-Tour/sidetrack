@@ -107,6 +107,7 @@ async function joinRoom(code) {
     pingTimer: null,
   };
   connectGuest(guest);
+  warmPlayer();
   update();
 }
 
@@ -262,6 +263,16 @@ function followHost(g) {
   if (Math.abs(time - target) > 1.5) send({ action: "seek", time: target });
   if (s.playing && here.state !== 1 && here.state !== 3) send({ action: "play" });
   if (!s.playing && here.state === 1) send({ action: "pause" });
+}
+
+// Onglet du lecteur fermé pendant le salon : on le rouvre (masqué dès qu'il est prêt), et la
+// vidéo de l'hôte reprend au bon moment
+function guestPlayerLost() {
+  if (!guest || guest.status === "ended" || playerPort) return;
+  guest.loading = null;
+  playerTick = null;
+  if (guest.sync?.playing) followHost(guest);
+  else warmPlayer();
 }
 
 // Après une erreur de YouTube : on recharge la vidéo de l'hôte (voir retryVisible)

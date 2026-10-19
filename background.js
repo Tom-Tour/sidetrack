@@ -72,6 +72,7 @@ function update() {
     const snap = snapshot();
     for (const port of ports) port.postMessage(snap);
     roomUpdate();
+    syncCover();
   }, 30);
 }
 
@@ -293,6 +294,8 @@ function send(cmd) {
 }
 
 let returnTabId = null;
+let warmup = false;      // onglet ouvert d'avance, sans vidéo : on revient dès qu'il est prêt
+let coverShown = null;   // dernier état du cache envoyé à la page du lecteur
 let returnAfterStart = null; // retour à la navigation différé jusqu'au démarrage de la vidéo
 
 // Ouvre un onglet neuf pour le lecteur, en fermant un éventuel ancien onglet déconnecté.
@@ -346,6 +349,8 @@ function connectPlayer(port) {
   playerPort = port;
   playerTabId = port.sender.tab.id;
   playerShown = !!port.sender.tab.active;
+  coverShown = null; // page neuve : on lui redit tout de suite s'il faut cacher la vidéo
+  syncCover();
   port.onMessage.addListener(onPlayerMessage);
   port.onDisconnect.addListener(() => {
     if (playerPort !== port) return;
@@ -355,9 +360,35 @@ function connectPlayer(port) {
     playerShown = false;
     log(t("logTabClosed"));
     update();
+    // Invité d'un salon : l'onglet est indispensable, on le rouvre et on reprend où en est l'hôte
+    if (inGuestRoom()) setTimeout(guestPlayerLost, 500);
   });
   for (const cmd of queued) port.postMessage(cmd);
   queued = [];
+}
+
+// Ouvre l'onglet du lecteur d'avance, sans vidéo. Firefox ne lit les médias que dans un
+// onglet passé au moins une fois au premier plan : mieux vaut le faire avant la partie
+// qu'au début d'une manche. On revient à la navigation dès que le lecteur est prêt.
+function warmPlayer() {
+  if (playerPort || opening) return;
+  warmup = true;
+  openPlayerTab();
+}
+
+// Cache sur la vidéo, dans la page du lecteur : en blind test, rien n'est dévoilé même si
+// l'onglet s'affiche (premier chargement, clic sur « Activer le son », nouvel essai…)
+function videoHidden() {
+  if (inGuestRoom()) return guestHidesVideo();
+  return state.mode === "blind" && !room && state.blind.hideVideo && game.phase !== "revealed";
+}
+
+function syncCover() {
+  if (!playerPort) return;
+  const on = videoHidden();
+  if (on === coverShown) return;
+  coverShown = on;
+  playerPort.postMessage({ action: "cover", on });
 }
 
 // En blind test, la vidéo ne doit pas rester sous les yeux
@@ -402,6 +433,16 @@ function onPlayerMessage(msg) {
   switch (msg.type) {
     case "ready":
       log(t("logReady"));
+      if (warmup) {
+        warmup = false;
+        if (returnAfterStart && !loadingSince) {
+          clearTimeout(returnAfterStart);
+          returnAfterStart = setTimeout(() => {
+            returnAfterStart = null;
+            backToBrowsing();
+          }, 1000);
+        }
+      }
       break;
     case "log":
       log(msg.key ? t(msg.key) : String(msg.text ?? "")); // texte brut : ancienne page du lecteur en cache
@@ -509,9 +550,6 @@ const PERMANENT_ERRORS = [100, 101, 150, 153];
 
 function retryVisible(code) {
   if (retriedVisible || PERMANENT_ERRORS.includes(Number(code)) || playerTabId == null) return false;
-  // En blind test solo, afficher l'onglet dévoilerait la réponse
-  if (state.mode === "blind" && !room && !inGuestRoom() && state.blind.hideVideo) return false;
-  if (inGuestRoom() && guestHidesVideo()) return false;
   retriedVisible = true;
   log(t("logRetryVisible"));
   showForRetry();
