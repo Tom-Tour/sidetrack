@@ -9,7 +9,7 @@
   "permissions": [
     "storage",
     "tabHide",
-    "https://www.youtube.com/oembed*",
+    "https://www.youtube.com/*",
     "https://tom-tour.github.io/*"
   ],
   "background": { "scripts": ["background.js"] },

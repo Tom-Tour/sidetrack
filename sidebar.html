@@ -60,9 +60,16 @@
           <option value="20">20 s</option>
           <option value="30">30 s</option>
           <option value="0">Morceau entier</option>
+          <option value="-1">Durée du chapitre</option>
         </select>
       </label>
-      <label><input type="checkbox" id="randomStart"> Départ à un moment aléatoire</label>
+      <label>Départ
+        <select id="startMode">
+          <option value="start">Début du morceau</option>
+          <option value="random">Moment aléatoire</option>
+          <option value="chapter">Chapitre aléatoire</option>
+        </select>
+      </label>
       <label><input type="checkbox" id="hideVideo"> Masquer la vidéo</label>
     </fieldset>
   </section>

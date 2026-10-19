@@ -17,7 +17,9 @@ let state = {
   index: -1,           // morceau en cours dans la playlist
   shuffle: false,
   mode: "listen",      // "listen" | "blind"
-  blind: { clip: 20, randomStart: true, hideVideo: true },
+  // startMode : "start" début du morceau | "random" moment aléatoire | "chapter" chapitre aléatoire
+  // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
+  blind: { clip: 20, startMode: "random", hideVideo: true },
   volume: 100,
 };
 
@@ -130,6 +132,46 @@ async function fetchTitle(item) {
   }
   update();
   save();
+}
+
+// --- Chapitres --------------------------------------------------------------
+// Le lecteur intégré ne donne pas les chapitres : on les lit dans la page de la vidéo
+// (ytInitialData). Résultat mis en cache dans l'élément : [{ title, start }] en secondes.
+
+function collectChapters(node, out) {
+  if (Array.isArray(node)) {
+    for (const n of node) collectChapters(n, out);
+  } else if (node && typeof node === "object") {
+    const c = node.chapterRenderer;
+    if (c && typeof c.timeRangeStartMillis === "number") {
+      out.push({ title: c.title?.simpleText ?? "", start: Math.floor(c.timeRangeStartMillis / 1000) });
+    }
+    for (const key in node) collectChapters(node[key], out);
+  }
+}
+
+async function fetchChapters(item) {
+  try {
+    const r = await fetch(`https://www.youtube.com/watch?v=${item.id}`);
+    const m = (await r.text()).match(/var ytInitialData = (\{.*?\});<\/script>/s);
+    const found = [];
+    if (m) collectChapters(JSON.parse(m[1]), found);
+    const seen = new Set();
+    item.chapters = found
+      .filter((c) => !seen.has(c.start) && seen.add(c.start))
+      .sort((a, b) => a.start - b.start);
+  } catch (e) {
+    log(`Chapitres illisibles pour « ${item.title} » : ${e.message}`);
+    item.chapters = [];
+  }
+}
+
+async function ensureChapters(list) {
+  const missing = list.filter((item) => !Array.isArray(item.chapters));
+  for (let i = 0; i < missing.length; i += 4) {
+    await Promise.all(missing.slice(i, i + 4).map(fetchChapters));
+  }
+  if (missing.length) save();
 }
 
 function addItems(p, ids) {
@@ -343,14 +385,30 @@ function onPlayerMessage(msg) {
       update();
       break;
     case "started":
-      if (state.mode === "blind" && game.phase === "playing") startCountdown();
+      if (state.mode === "blind" && game.phase === "playing") {
+        // Dernier chapitre en « durée du chapitre » : sa fin dépend de la durée de la vidéo
+        if (game.clip == null && game.chapter) {
+          game.clip = Math.max(5, Math.floor(msg.duration - game.chapter.start));
+          game.remaining = game.clip;
+        }
+        startCountdown();
+      }
       break;
     case "error":
       {
         const item = items()[state.index];
         log(`✗ Erreur YouTube ${msg.code} sur ${item ? `« ${item.title} » (${item.id})` : "aucun morceau"}`);
       }
-      if (msg.code === "playlist-empty") break;
+      if (msg.code === "playlist-empty") {
+        notice = {
+          text:
+            "Impossible de lire cette playlist. Elle est sûrement privée (ou c'est « À regarder plus tard », " +
+            "« J'aime » ou un Mix) : le lecteur intégré ne voit pas ton compte YouTube. " +
+            "Passe-la en « Non répertoriée » sur YouTube puis réessaie.",
+        };
+        update();
+        break;
+      }
       if (state.mode === "blind") setTimeout(nextRound, 1000);
       else setTimeout(next, 1500);
       break;
@@ -398,23 +456,37 @@ function toggle() {
 
 // --- Mode blind test -------------------------------------------------------
 
-function shuffled(n) {
-  const a = [...Array(n).keys()];
-  for (let i = n - 1; i > 0; i--) {
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
 
+// game.order : manches [{ i, chapter? }] ; game.clip : durée de la manche en cours
+// (0 = morceau entier, null = inconnue tant que la vidéo n'a pas démarré)
 function resetGame() {
   clearInterval(gameTimer);
-  game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0 };
+  game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0, clip: 0, chapter: null };
 }
 
-function startGame() {
+async function startGame() {
   resetGame();
-  game.order = shuffled(items().length);
+  let rounds = items().map((_, i) => ({ i }));
+  if (state.blind.startMode === "chapter") {
+    // Une manche par chapitre ; une vidéo sans chapitres reste une seule manche
+    game.phase = "loading";
+    update();
+    const list = items();
+    await ensureChapters(list);
+    if (game.phase !== "loading" || list !== items()) return; // partie annulée entre-temps
+    rounds = list.flatMap((item, i) =>
+      item.chapters.length ? item.chapters.map((_, chapter) => ({ i, chapter })) : [{ i }]
+    );
+    log(`Partie par chapitres : ${rounds.length} manches`);
+  }
+  game.order = shuffle(rounds);
   nextRound();
 }
 
@@ -426,14 +498,32 @@ function nextRound() {
     send({ action: "pause" });
     return update();
   }
+  const { i, chapter } = game.order[game.pos];
+  const { clip, startMode } = state.blind;
+  const chapters = items()[i].chapters;
   game.phase = "playing";
-  game.remaining = state.blind.clip;
-  play(game.order[game.pos], { randomStart: state.blind.randomStart, clip: state.blind.clip });
+
+  if (chapter != null) {
+    const start = chapters[chapter].start;
+    const end = chapters[chapter + 1]?.start ?? null;
+    game.chapter = { title: chapters[chapter].title, start };
+    const length = end != null ? end - start : null;
+    if (clip === -1) game.clip = length;
+    else if (clip && length != null) game.clip = Math.min(clip, length);
+    else game.clip = clip;
+    play(i, { start });
+  } else {
+    // « Durée du chapitre » sans chapitre : extrait de 20 s
+    game.chapter = null;
+    game.clip = clip === -1 ? 20 : clip;
+    play(i, { randomStart: startMode !== "start", clip: game.clip });
+  }
+  game.remaining = game.clip ?? 0;
 }
 
 function startCountdown() {
   clearInterval(gameTimer);
-  if (state.blind.clip) {
+  if (game.clip) {
     gameTimer = setInterval(() => {
       game.remaining--;
       if (game.remaining <= 0) timeUp();
@@ -503,6 +593,8 @@ const actions = {
   answer,
   setBlind: (key, value) => {
     state.blind[key] = value;
+    // « Durée du chapitre » n'a de sens qu'avec un départ par chapitre
+    if (key === "startMode" && value !== "chapter" && state.blind.clip === -1) state.blind.clip = 20;
     update();
     save();
   },
@@ -525,7 +617,13 @@ const actions = {
 
 browser.storage.local.get("sidetrack").then((s) => {
   if (s.sidetrack) {
-    state = { ...state, ...s.sidetrack, blind: { ...state.blind, ...s.sidetrack.blind } };
+    const blind = { ...state.blind, ...s.sidetrack.blind };
+    // Ancien réglage : case « départ aléatoire »
+    if ("randomStart" in blind) {
+      blind.startMode = blind.randomStart ? "random" : "start";
+      delete blind.randomStart;
+    }
+    state = { ...state, ...s.sidetrack, blind };
   }
   if (!state.playlists.length) newPlaylist("Ma playlist");
   if (!playlist()) state.current = state.playlists[0].id;

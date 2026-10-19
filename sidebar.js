@@ -93,9 +93,8 @@ $("#mode-listen").addEventListener("click", () => act("setMode", "listen"));
 $("#mode-blind").addEventListener("click", () => act("setMode", "blind"));
 
 $("#clip").addEventListener("change", (e) => act("setBlind", "clip", Number(e.target.value)));
-for (const key of ["randomStart", "hideVideo"]) {
-  $("#" + key).addEventListener("change", (e) => act("setBlind", key, e.target.checked));
-}
+$("#startMode").addEventListener("change", (e) => act("setBlind", "startMode", e.target.value));
+$("#hideVideo").addEventListener("change", (e) => act("setBlind", "hideVideo", e.target.checked));
 
 // --- Affichage -------------------------------------------------------------
 
@@ -131,6 +130,10 @@ function renderBlind(game, n) {
       status.textContent = n ? `${n} morceau${n > 1 ? "x" : ""} dans la playlist.` : "Playlist vide.";
       actions.replaceChildren(button("▶ Démarrer la partie", () => act("startGame")));
       actions.firstChild.disabled = !n;
+      break;
+    case "loading":
+      status.textContent = "Chargement des chapitres…";
+      actions.replaceChildren();
       break;
     case "playing":
       status.textContent = round;
@@ -211,15 +214,21 @@ function render() {
   $("#show-player").hidden = blind;
   $("#mask").hidden = !(secret && state.blind.hideVideo);
   $("#mask-time").textContent =
-    game.phase === "timeup" ? "Temps écoulé" : state.blind.clip ? formatTime(game.remaining) : "";
-  $("#now").textContent = secret ? "Morceau mystère" : current?.title ?? "Rien en lecture";
+    game.phase === "timeup" ? "Temps écoulé" : game.clip ? formatTime(game.remaining) : "";
+  // Une fois révélé, en partie par chapitres, la réponse est le titre du chapitre
+  const answer =
+    blind && game.phase === "revealed" && game.chapter?.title
+      ? `${game.chapter.title} · ${current?.title ?? ""}`
+      : current?.title;
+  $("#now").textContent = secret ? "Morceau mystère" : answer ?? "Rien en lecture";
 
   $("#toggle").textContent = view.playerState === 1 ? "⏸" : "▶";
   $("#shuffle").classList.toggle("on", state.shuffle);
   if (document.activeElement !== $("#volume")) $("#volume").value = String(state.volume ?? 100);
 
+  $("#clip").querySelector('option[value="-1"]').disabled = state.blind.startMode !== "chapter";
   if (document.activeElement !== $("#clip")) $("#clip").value = String(state.blind.clip);
-  $("#randomStart").checked = state.blind.randomStart;
+  if (document.activeElement !== $("#startMode")) $("#startMode").value = state.blind.startMode;
   $("#hideVideo").checked = state.blind.hideVideo;
 
   $("#log").textContent = view.log.join("\n");

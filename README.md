@@ -12,7 +12,7 @@ A Firefox extension to build local playlists from YouTube links and play them in
 - Add a YouTube video or a whole playlist by pasting its link
 - Plays in the Firefox sidebar, keeps playing while you switch tabs
 - Auto-advance and shuffle
-- **Blind-test mode**: random order without repeats, hidden video, random start point, timed clips (10–30 s), reveal and score
+- **Blind-test mode**: random order without repeats, hidden video, start at the beginning, a random point or a random chapter, timed clips (10–30 s or the chapter length), reveal and score. With chapters, every chapter of a compilation becomes a round
 - Export a playlist to YouTube (no login or API key needed, 50 videos per link)
 - Everything is stored locally in Firefox
 

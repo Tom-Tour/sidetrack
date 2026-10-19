@@ -90,7 +90,7 @@ function onPlaying() {
   announced = true;
   unmutedAt = Date.now();
   unMute();
-  send({ type: "started" });
+  send({ type: "started", duration: player.getDuration() });
 }
 
 function waitPlaying(attempt) {
@@ -126,7 +126,7 @@ function run(cmd) {
       // Démarrage toujours en muet : c'est la seule lecture automatique que Firefox autorise
       // sans clic. Le son revient dans onPlaying, après l'éventuel saut aléatoire.
       player.mute();
-      player.loadVideoById(cmd.id);
+      player.loadVideoById({ videoId: cmd.id, startSeconds: cmd.start ?? 0 });
       break;
     case "playlist":
       importingPlaylist = true;
