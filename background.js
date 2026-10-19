@@ -372,7 +372,7 @@ function onPlayerMessage(msg) {
       log(t("logReady"));
       break;
     case "log":
-      log(t(msg.key));
+      log(msg.key ? t(msg.key) : String(msg.text ?? "")); // texte brut : ancienne page du lecteur en cache
       break;
     case "hello":
       log(t("logAutoplay", msg.autoplay));
