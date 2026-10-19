@@ -67,7 +67,15 @@ browser.runtime.onConnect.addListener((port) => {
   if (port.name !== "sidebar") return;
   ports.add(port);
   port.onDisconnect.addListener(() => ports.delete(port));
-  port.onMessage.addListener(({ cmd, args = [] }) => actions[cmd]?.(...args));
+  port.onMessage.addListener(async ({ cmd, args = [] }) => {
+    // Une erreur dans une commande serait sinon invisible : on la met au journal
+    try {
+      await actions[cmd]?.(...args);
+    } catch (e) {
+      log(`✗ Erreur (${cmd}) : ${e.message}`);
+      console.error(e);
+    }
+  });
   port.postMessage(snapshot());
 });
 

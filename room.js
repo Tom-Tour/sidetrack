@@ -22,6 +22,10 @@ function makeCode() {
 
 function openRoom() {
   if (room) return;
+  log(
+    `Création du salon : PeerJS ${typeof Peer === "function" ? "chargé" : "ABSENT"}, ` +
+      `WebRTC ${typeof RTCPeerConnection === "function" ? "disponible" : "ABSENT"}`
+  );
   const code = makeCode();
   const peer = new Peer(ROOM_PREFIX + code);
   room = { code, link: `${JOIN_URL}#${code}`, status: "opening", peer, players: new Map(), chat: [] };
