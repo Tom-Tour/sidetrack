@@ -263,6 +263,14 @@ function followHost(g) {
   if (!s.playing && here.state === 1) send({ action: "pause" });
 }
 
+// Après une erreur de YouTube : on recharge la vidéo de l'hôte (voir retryVisible)
+function guestRetry() {
+  if (!guest) return;
+  guest.loading = null;
+  playerTick = null;
+  followHost(guest);
+}
+
 // En blind test, tant que la réponse n'est pas révélée, la vidéo reste cachée (si l'hôte le veut)
 function guestHidesVideo() {
   const blind = guest?.host?.blind;

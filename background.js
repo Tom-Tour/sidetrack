@@ -363,10 +363,14 @@ async function focusPlayer(toggle = false) {
   browser.tabs.update(playerTabId, { active: true });
 }
 
+let lastPlay = null;      // { i, opts } : dernier morceau lancé, rejoué si YouTube échoue
+let retriedVisible = false; // reprise déjà tentée onglet affiché, depuis le dernier départ réussi
+
 function play(i, opts = {}) {
   // Invité d'un salon : c'est l'hôte qui choisit la musique
   if (inGuestRoom() || i < 0 || i >= items().length) return;
   state.index = i;
+  lastPlay = { i, opts };
   log(t("logPlaying", items()[i].title));
   send({ action: "load", id: items()[i].id, volume: state.volume, ...opts });
   update();
@@ -422,9 +426,9 @@ function onPlayerMessage(msg) {
       update();
       break;
     case "started":
+      retriedVisible = false;
       // Le son revient juste au démarrage, et Firefox peut encore couper la lecture pendant
-      // ~2 s : quitter l'onglet tout de suite faisait échouer le tout premier morceau.
-      // En blind test, le saut à un moment aléatoire retardait le départ, d'où la différence.
+      // ~2 s : on reste sur l'onglet le temps que le départ soit acquis.
       if (returnAfterStart) {
         clearTimeout(returnAfterStart);
         returnAfterStart = setTimeout(() => {
@@ -446,12 +450,19 @@ function onPlayerMessage(msg) {
         const item = items()[state.index];
         log(t("logYoutubeError", msg.code, item ? `« ${item.title} » (${item.id})` : t("logNoTrack")));
       }
-      if (inGuestRoom()) break; // la suite dépend de l'hôte
       if (msg.code === "playlist-empty") {
         notice = { key: "noticePrivatePlaylist" };
         update();
         break;
       }
+      // YouTube refuse parfois de démarrer dans l'onglet masqué (« Une erreur s'est produite ») :
+      // on l'affiche et on relance, comme le ferait un clic sur 📺
+      if (retryVisible(msg.code)) {
+        if (inGuestRoom()) guestRetry();
+        else if (lastPlay) play(lastPlay.i, lastPlay.opts);
+        break;
+      }
+      if (inGuestRoom()) break; // la suite dépend de l'hôte
       if (state.mode === "blind") setTimeout(nextRound, 1000);
       else setTimeout(next, 1500);
       break;
@@ -465,6 +476,35 @@ function onPlayerMessage(msg) {
       break;
     }
   }
+}
+
+// Erreurs définitives (vidéo supprimée, privée, intégration interdite) : rien à retenter
+const PERMANENT_ERRORS = [100, 101, 150, 153];
+
+function retryVisible(code) {
+  if (retriedVisible || PERMANENT_ERRORS.includes(Number(code)) || playerTabId == null) return false;
+  // En blind test solo, afficher l'onglet dévoilerait la réponse
+  if (state.mode === "blind" && !room && !inGuestRoom() && state.blind.hideVideo) return false;
+  if (inGuestRoom() && guestHidesVideo()) return false;
+  retriedVisible = true;
+  log(t("logRetryVisible"));
+  showForRetry();
+  return true;
+}
+
+async function showForRetry() {
+  const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (active?.id !== playerTabId) {
+    returnTabId = active?.id ?? null;
+    await browser.tabs.show(playerTabId).catch(() => {});
+    browser.tabs.update(playerTabId, { active: true }).catch(() => {});
+  }
+  // Retour à la navigation après le départ (voir « started »), ou au plus tard dans 15 s
+  clearTimeout(returnAfterStart);
+  returnAfterStart = setTimeout(() => {
+    returnAfterStart = null;
+    backToBrowsing();
+  }, 15000);
 }
 
 function onEnded() {
