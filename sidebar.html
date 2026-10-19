@@ -21,7 +21,13 @@
   </form>
 
   <section id="room">
-    <button id="room-open">👥 Créer un salon</button>
+    <div id="room-start">
+      <button id="room-open">👥 Créer un salon</button>
+      <form id="room-join">
+        <input id="join-code" type="text" placeholder="Code d'un salon" maxlength="5" autocomplete="off">
+        <button type="submit">Rejoindre</button>
+      </form>
+    </div>
     <div id="room-panel" hidden>
       <div id="room-head">
         <span>Salon <strong id="room-code"></strong></span>

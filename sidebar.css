@@ -65,7 +65,10 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .chapters time { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 #room { margin-top: 8px; }
-#room-open { width: 100%; }
+#room-start { display: flex; gap: 4px; }
+#room-open { flex: 1; }
+#room-join { display: flex; gap: 4px; }
+#join-code { width: 8em; text-transform: uppercase; letter-spacing: 1px; }
 #room-panel { border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
 #room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #room-head strong { font-size: 15px; letter-spacing: 1px; }

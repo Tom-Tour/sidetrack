@@ -626,6 +626,7 @@ const actions = {
   // Fonctions de room.js, chargé après ce fichier : on ne les référence qu'à l'appel
   openRoom: () => openRoom(),
   closeRoom: () => closeRoom(),
+  joinRoom: (code) => joinRoom(code),
   hostChat: (text) => hostChat(text),
   award: (playerId, delta) => award(playerId, delta),
   next,

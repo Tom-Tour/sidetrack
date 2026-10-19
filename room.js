@@ -57,6 +57,15 @@ function openRoom() {
   update();
 }
 
+// Rejoindre le salon de quelqu'un : la page invité s'ouvre dans un onglet visible
+// (il faut voir la vidéo et cliquer dans la page pour avoir le son)
+function joinRoom(code) {
+  code = String(code).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code.length !== 5) return log("✗ Code de salon invalide (5 caractères)");
+  send({ action: "pause" }); // notre propre musique laisse la place au salon
+  browser.tabs.create({ url: `${JOIN_URL}#${code}` });
+}
+
 function closeRoom() {
   if (!room) return;
   broadcast({ t: "closed" });

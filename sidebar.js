@@ -84,6 +84,13 @@ $("#add").addEventListener("submit", (e) => {
 // --- Salon -----------------------------------------------------------------
 
 $("#room-open").addEventListener("click", () => act("openRoom"));
+$("#room-join").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const code = $("#join-code").value.trim().toUpperCase();
+  if (!code) return;
+  act("joinRoom", code);
+  $("#join-code").value = "";
+});
 $("#room-close").addEventListener("click", () => act("closeRoom"));
 $("#room-copy").addEventListener("click", async (e) => {
   const btn = e.currentTarget;
@@ -170,7 +177,7 @@ function chatText(parent, text) {
 
 function renderRoom(blind) {
   const room = view.room;
-  $("#room-open").hidden = !!room;
+  $("#room-start").hidden = !!room;
   $("#room-panel").hidden = !room;
   if (!room) return;
 
