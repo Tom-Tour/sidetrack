@@ -14,6 +14,9 @@ window.addEventListener("message", (e) => {
   port.postMessage(JSON.parse(JSON.stringify(e.data)));
 });
 
-// Signe de vie : si l'extension disparaît, ce minuteur meurt avec elle
-// et la page du lecteur se ferme d'elle-même.
+// Extension désinstallée, désactivée ou rechargée : la page du lecteur se ferme
+port.onDisconnect.addListener(() => toPage({ action: "orphan" }));
+
+// Signe de vie, en secours si la déconnexion n'a pas pu être signalée :
+// ce minuteur meurt avec l'extension.
 setInterval(() => toPage({ action: "ping" }), 1000);

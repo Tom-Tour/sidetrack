@@ -12,6 +12,7 @@ let volume = 100;
 let wantPlaying = false;
 let stalled = 0;
 let lastPing = 0;        // dernier signe de vie de l'extension
+let lastCheck = 0;       // dernier passage du minuteur de surveillance
 let orphaned = false;
 
 const unlock = document.getElementById("unlock");
@@ -63,7 +64,10 @@ window.onYouTubeIframeAPIReady = () => {
         }
         if (importingPlaylist && e.data === YT.PlayerState.CUED) sendPlaylist(0);
       },
-      onError: (e) => send({ type: "error", code: e.data }),
+      onError: (e) => {
+        wantPlaying = false; // sinon le filet de sécurité relancerait la vidéo en erreur
+        send({ type: "error", code: e.data });
+      },
     },
   });
 };
@@ -152,8 +156,19 @@ window.addEventListener("message", (e) => {
     lastPing = Date.now();
     return;
   }
+  if (e.data.action === "orphan") return shutDown();
   run(e.data);
 });
+
+// L'extension n'est plus là (désinstallée, désactivée ou rechargée) : on s'arrête
+function shutDown() {
+  if (orphaned) return;
+  orphaned = true;
+  player?.pauseVideo?.();
+  window.close();
+  document.body.textContent = "Sidetrack n'est plus actif : tu peux fermer cet onglet.";
+  document.body.style.cssText = "color:#fff;display:flex;align-items:center;justify-content:center";
+}
 
 // Filet de sécurité et détection de la désinstallation
 setInterval(() => {
@@ -171,12 +186,11 @@ setInterval(() => {
     stalled = 0;
   }
 
-  // Plus de nouvelles de l'extension (désinstallée ou désactivée) : on s'arrête
-  if (lastPing && Date.now() - lastPing > 4000) {
-    orphaned = true;
-    player.pauseVideo();
-    window.close();
-    document.body.textContent = "Sidetrack n'est plus actif : tu peux fermer cet onglet.";
-    document.body.style.cssText = "color:#fff;display:flex;align-items:center;justify-content:center";
-  }
+  // Secours : plus aucun signe de vie depuis une minute. Firefox ralentit les minuteurs
+  // des onglets en arrière-plan : si ce minuteur-ci a lui-même pris du retard, les signes
+  // de vie aussi, et on ne conclut rien.
+  const now = Date.now();
+  if (now - lastCheck > 5000) lastPing = Math.max(lastPing, now);
+  lastCheck = now;
+  if (lastPing && now - lastPing > 60000) shutDown();
 }, 1000);
