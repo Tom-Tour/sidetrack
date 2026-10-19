@@ -49,6 +49,10 @@ function onPlaying() {
   announced = true;
   player.unMute();
   send({ type: "started" });
+  // Diagnostic : Firefox peut bloquer le son d'un lecteur qui n'a reçu aucun clic.
+  setTimeout(() => {
+    send({ type: "debug", muted: player.isMuted(), state: player.getPlayerState(), volume: player.getVolume() });
+  }, 1000);
 }
 
 function waitPlaying(attempt) {
@@ -79,9 +83,9 @@ function run(cmd) {
     case "load":
       announced = false;
       randomStart = cmd.randomStart ? { clip: cmd.clip } : null;
-      // Son coupé pendant le saut aléatoire, pour ne pas entendre le début du morceau.
-      if (randomStart) player.mute();
-      else player.unMute();
+      // Démarrage toujours en muet : c'est la seule lecture automatique que Firefox autorise
+      // sans clic. Le son revient dans onPlaying, après l'éventuel saut aléatoire.
+      player.mute();
       player.loadVideoById(cmd.id);
       break;
     case "playlist":
