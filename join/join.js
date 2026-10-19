@@ -183,23 +183,60 @@ if (typeof secret !== "string" || !/^[0-9a-f]{64}$/.test(secret)) {
 }
 const identity = { secret: unhex(secret), pubkey: NostrTools.getPublicKey(unhex(secret)) };
 
-// Preuve de travail d'au moins `bits` bits pour notre identité (cherchée une seule fois)
-function proofOfWork(bits) {
+// Bits exigés par un salon public (POW_BITS dans room.js)
+const PREMINE_BITS = 8;
+
+let mining = null;      // { bits, tries, promise } : calcul en cours
+let powWaiting = false; // l'invité attend la fin du calcul pour entrer
+
+// Preuve déjà calculée dans ce navigateur, ou null
+function savedProof(bits) {
   const saved = store("sidetrack-pow");
-  if (saved?.pubkey === identity.pubkey && saved.bits >= bits && Number.isSafeInteger(saved.nonce)) {
-    return Promise.resolve(saved.nonce);
-  }
-  return new Promise((resolve) => {
-    const worker = new Worker("../pow-worker.js");
+  return saved?.pubkey === identity.pubkey && saved.bits >= bits && Number.isSafeInteger(saved.nonce) ? saved.nonce : null;
+}
+
+function startMining(bits) {
+  if (mining && mining.bits >= bits) return mining.promise;
+  const worker = new Worker("../pow-worker.js");
+  const job = { bits, tries: 0 };
+  job.promise = new Promise((resolve) => {
     worker.onmessage = ({ data }) => {
-      if (data.t === "progress") return loginStatus(t("preparing", data.tries));
+      if (data.t === "progress") {
+        job.tries = data.tries;
+        if (powWaiting) loginStatus(t("preparing", data.tries));
+        return;
+      }
       worker.terminate();
       store("sidetrack-pow", { pubkey: identity.pubkey, bits, nonce: data.nonce });
       resolve(data.nonce);
     };
-    loginStatus(t("preparing", 0));
-    worker.postMessage({ t: "mine", pubkey: identity.pubkey, bits });
   });
+  worker.postMessage({ t: "mine", pubkey: identity.pubkey, bits });
+  mining = job;
+  return job.promise;
+}
+
+// Preuve de travail d'au moins `bits` bits pour notre identité (cherchée une seule fois)
+async function proofOfWork(bits) {
+  const saved = savedProof(bits);
+  if (saved != null) return saved;
+  powWaiting = true;
+  loginStatus(t("preparing", mining?.tries ?? 0));
+  try {
+    return await startMining(bits);
+  } finally {
+    powWaiting = false;
+  }
+}
+
+// Calcul lancé dès l'ouverture de la page, en arrière-plan : le temps de taper son pseudo,
+// il est souvent déjà fini quand on rejoint un salon public
+if (savedProof(PREMINE_BITS) == null) {
+  try {
+    startMining(PREMINE_BITS);
+  } catch {
+    // pas de Worker : le calcul se fera à la demande
+  }
 }
 
 // Réponse au défi : signée par notre identité, pour ce salon et ce défi précis
