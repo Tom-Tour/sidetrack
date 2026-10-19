@@ -338,7 +338,10 @@ function onPlayerMessage(msg) {
       if (state.mode === "blind" && game.phase === "playing") startCountdown();
       break;
     case "error":
-      log(`✗ Erreur YouTube ${msg.code}`);
+      {
+        const item = items()[state.index];
+        log(`✗ Erreur YouTube ${msg.code} sur ${item ? `« ${item.title} » (${item.id})` : "aucun morceau"}`);
+      }
       if (msg.code === "playlist-empty") break;
       if (state.mode === "blind") setTimeout(nextRound, 1000);
       else setTimeout(next, 1500);
