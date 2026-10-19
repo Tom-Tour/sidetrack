@@ -29,6 +29,7 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 #pl-bar, #add { display: flex; gap: 4px; }
 #add { margin-top: 6px; }
 #pl-select, #pl-name, #url { flex: 1; min-width: 0; }
+#open-settings { margin-left: 4px; }
 
 #tabs { display: flex; margin-top: 8px; border-bottom: 1px solid var(--border); }
 .tab { flex: 1; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); }
@@ -64,18 +65,19 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .chapters .row { gap: 6px; }
 .chapters time { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-#room { margin-top: 8px; }
-#room-start { display: grid; gap: 4px; }
-#room-start .line { display: flex; align-items: center; gap: 4px; }
-#room-open { flex: 1; }
+#multi { margin-top: 6px; }
+#multi-bar { display: flex; align-items: center; gap: 4px; }
+.chip { flex: 1; padding: 2px 6px; border-radius: 12px; }
+.sub { display: grid; gap: 4px; margin-top: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 4px; }
+.line { display: flex; align-items: center; gap: 4px; }
+.sub.line { display: flex; }
 #room-name, #join-code { flex: 1; min-width: 0; }
 #join-code { text-transform: uppercase; letter-spacing: 1px; }
-#public-rooms { margin-top: 2px; }
-#public-rooms .line { justify-content: space-between; margin: 4px 0; }
+#browse .line { justify-content: space-between; }
 #public-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 #public-list li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; }
 #public-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#room-panel { border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
+#room-panel { margin-top: 4px; border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
 #room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #room-head strong { font-size: 15px; letter-spacing: 1px; }
 #room-close { margin-left: auto; }
@@ -98,6 +100,10 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 #blind-settings { margin: 10px 0 0; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
 #blind-settings label { display: block; margin: 4px 0; }
 
+#settings fieldset { margin: 10px 0 0; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
+#settings label { display: block; margin: 6px 0; }
+#settings p { margin: 4px 0; }
+#settings a { color: var(--accent); }
 details { margin-top: 10px; }
 summary { cursor: pointer; color: var(--muted); }
 #log { max-height: 160px; overflow: auto; font-size: 11px; color: var(--muted); white-space: pre-wrap; margin: 4px 0 0; }

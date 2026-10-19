@@ -15,7 +15,17 @@ let lastPing = 0;        // dernier signe de vie de l'extension
 let lastCheck = 0;       // dernier passage du minuteur de surveillance
 let orphaned = false;
 
+let lastLoad = null;     // dernière commande « load », rejouée en cas d'échec
+let retried = false;     // une seule nouvelle tentative par chargement
+let stallRestarts = 0;
+
 const unlock = document.getElementById("unlock");
+
+// Les deux seuls textes de la page, dans la langue du navigateur
+const TEXT = navigator.language.toLowerCase().startsWith("fr")
+  ? { unlock: "🔊 Activer le son", orphan: "Sidetrack n'est plus actif : tu peux fermer cet onglet." }
+  : { unlock: "🔊 Enable sound", orphan: "Sidetrack is no longer active: you can close this tab." };
+unlock.querySelector("button").textContent = TEXT.unlock;
 
 function send(msg) {
   window.postMessage({ sidetrack: true, ...msg }, location.origin);
@@ -65,6 +75,13 @@ window.onYouTubeIframeAPIReady = () => {
         if (importingPlaylist && e.data === YT.PlayerState.CUED) sendPlaylist(0);
       },
       onError: (e) => {
+        // Le tout premier chargement échoue parfois sans raison : on retente une fois
+        if (lastLoad && !retried) {
+          retried = true;
+          send({ type: "log", key: "logRetry" });
+          setTimeout(() => load(lastLoad, true), 1000);
+          return;
+        }
         wantPlaying = false; // sinon le filet de sécurité relancerait la vidéo en erreur
         send({ type: "error", code: e.data });
       },
@@ -117,6 +134,20 @@ function position() {
   return { id: player.getVideoData()?.video_id, time: player.getCurrentTime() };
 }
 
+function load(cmd, retry = false) {
+  lastLoad = cmd;
+  retried = retry;
+  stallRestarts = 0;
+  announced = false;
+  wantPlaying = true;
+  if (cmd.volume != null) volume = cmd.volume;
+  randomStart = cmd.randomStart ? { clip: cmd.clip } : null;
+  // Démarrage toujours en muet : c'est la seule lecture automatique que Firefox autorise
+  // sans clic. Le son revient dans onPlaying, après l'éventuel saut aléatoire.
+  player.mute();
+  player.loadVideoById({ videoId: cmd.id, startSeconds: cmd.start ?? 0 });
+}
+
 function run(cmd) {
   if (!player?.loadVideoById) {
     pending = cmd;
@@ -124,14 +155,7 @@ function run(cmd) {
   }
   switch (cmd.action) {
     case "load":
-      announced = false;
-      wantPlaying = true;
-      if (cmd.volume != null) volume = cmd.volume;
-      randomStart = cmd.randomStart ? { clip: cmd.clip } : null;
-      // Démarrage toujours en muet : c'est la seule lecture automatique que Firefox autorise
-      // sans clic. Le son revient dans onPlaying, après l'éventuel saut aléatoire.
-      player.mute();
-      player.loadVideoById({ videoId: cmd.id, startSeconds: cmd.start ?? 0 });
+      load(cmd);
       break;
     case "playlist":
       importingPlaylist = true;
@@ -174,7 +198,7 @@ function shutDown() {
   orphaned = true;
   player?.pauseVideo?.();
   window.close();
-  document.body.textContent = "Sidetrack n'est plus actif : tu peux fermer cet onglet.";
+  document.body.textContent = TEXT.orphan;
   document.body.style.cssText = "color:#fff;display:flex;align-items:center;justify-content:center";
 }
 
@@ -188,8 +212,14 @@ setInterval(() => {
   if (wantPlaying && unlock.hidden && (state === YT.PlayerState.UNSTARTED || state === YT.PlayerState.CUED)) {
     if (++stalled >= 3) {
       stalled = 0;
-      send({ type: "log", text: "Relance de la lecture" });
-      player.playVideo();
+      // Deux relances sans effet : on recharge carrément la vidéo (une fois)
+      if (++stallRestarts > 2 && lastLoad && !retried) {
+        send({ type: "log", key: "logReload" });
+        load(lastLoad, true);
+      } else {
+        send({ type: "log", key: "logRetry" });
+        player.playVideo();
+      }
     }
   } else {
     stalled = 0;

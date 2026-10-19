@@ -21,11 +21,13 @@ let state = {
   // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
   blind: { clip: 20, startMode: "random", hideVideo: true },
   volume: 100,
+  lang: "auto",        // "auto" | "fr" | "en"
+  showMulti: true,     // ligne 👥 visible (décochable pour un usage solo)
 };
 
 let playerState = -1;  // -1 non démarré, 0 fini, 1 lecture, 2 pause, 5 prête
 let importTarget = null;
-let notice = null;
+let notice = null;     // { key, args?, focus? } : traduit par la barre latérale
 let logLines = [];
 
 // Partie de blind test en cours (non sauvegardée)
@@ -72,7 +74,7 @@ browser.runtime.onConnect.addListener((port) => {
     try {
       await actions[cmd]?.(...args);
     } catch (e) {
-      log(`✗ Erreur (${cmd}) : ${e.message}`);
+      log(t("logCommandError", cmd, e.message));
       console.error(e);
     }
   });
@@ -108,7 +110,7 @@ function selectPlaylist(id) {
 function deletePlaylist() {
   state.playlists = state.playlists.filter((p) => p.id !== state.current);
   state.current = null;
-  selectPlaylist((state.playlists[0] ?? newPlaylist("Ma playlist")).id);
+  selectPlaylist((state.playlists[0] ?? newPlaylist(t("defaultPlaylist"))).id);
 }
 
 // --- Ajout de liens ----------------------------------------------------------
@@ -135,7 +137,7 @@ async function fetchTitle(item) {
       "https://www.youtube.com/oembed?format=json&url=" +
         encodeURIComponent("https://www.youtube.com/watch?v=" + item.id)
     );
-    item.title = r.ok ? (await r.json()).title : `(indisponible) ${item.id}`;
+    item.title = r.ok ? (await r.json()).title : t("unavailable", item.id);
   } catch {
     item.title = item.id;
   }
@@ -170,7 +172,7 @@ async function fetchChapters(item) {
       .filter((c) => !seen.has(c.start) && seen.add(c.start))
       .sort((a, b) => a.start - b.start);
   } catch (e) {
-    log(`Chapitres illisibles pour « ${item.title} » : ${e.message}`);
+    log(t("logChaptersError", item.title, e.message));
     item.chapters = [];
   }
 }
@@ -196,13 +198,13 @@ function addLink(text) {
   const { id, list } = parseLink(text);
   if (list && !id) {
     importTarget = p.id;
-    log(`Import de la playlist ${list}…`);
+    log(t("logImporting", list));
     send({ action: "playlist", list });
   } else if (id) {
     addItems(p, [id]);
     if (state.mode === "listen" && (state.index < 0 || playerState === 0)) play(p.items.length - 1);
   } else {
-    log("✗ Lien non reconnu");
+    log(t("logBadLink"));
   }
   update();
   save();
@@ -241,7 +243,7 @@ function removeItem(i) {
 async function exportPlaylist() {
   const ids = items().map((item) => item.id);
   if (!ids.length) {
-    notice = { text: "Playlist vide : rien à exporter." };
+    notice = { key: "noticeExportEmpty" };
     return update();
   }
   const parts = Math.ceil(ids.length / EXPORT_CHUNK);
@@ -252,17 +254,13 @@ async function exportPlaylist() {
       active: i === 0,
     });
   }
-  notice = {
-    text:
-      (parts > 1 ? `Playlist ouverte sur YouTube en ${parts} parties (50 vidéos max par partie). ` : "Playlist ouverte sur YouTube. ") +
-      "Pour la garder : dans le panneau de la playlist, ouvre le menu ⋮ puis « Tout ajouter à… » et choisis ou crée une playlist de ton compte.",
-  };
-  log(`Export : ${ids.length} vidéos, ${parts} onglet(s)`);
+  notice = parts > 1 ? { key: "noticeExportedParts", args: [parts] } : { key: "noticeExported" };
+  log(t("logExport", ids.length, parts));
 }
 
 // --- Lecteur ---------------------------------------------------------------
 
-const STATE_NAMES = { "-1": "non démarré", 0: "fini", 1: "lecture", 2: "pause", 3: "chargement", 5: "prêt" };
+const STATE_NAMES = { "-1": "stateUnstarted", 0: "stateEnded", 1: "statePlaying", 2: "statePaused", 3: "stateBuffering", 5: "stateCued" };
 
 let playerPort = null;
 let playerTabId = null;
@@ -278,6 +276,7 @@ function send(cmd) {
 }
 
 let returnTabId = null;
+let returnAfterStart = null; // retour à la navigation différé jusqu'au démarrage de la vidéo
 
 // Ouvre un onglet neuf pour le lecteur, en fermant un éventuel ancien onglet déconnecté.
 // Il passe au premier plan : Firefox ne lance aucun média dans un onglet jamais affiché.
@@ -307,7 +306,7 @@ async function backToBrowsing() {
 // L'onglet du lecteur n'est visible que tant qu'on est dessus
 browser.tabs.onActivated.addListener(({ previousTabId }) => {
   if (previousTabId != null && previousTabId === playerTabId) {
-    browser.tabs.hide(playerTabId).catch((e) => log(`Impossible de masquer l'onglet : ${e.message}`));
+    browser.tabs.hide(playerTabId).catch((e) => log(t("logHideError", e.message)));
   }
 });
 
@@ -316,7 +315,7 @@ function connectPlayer(port) {
   // un tel onglet peut n'avoir jamais été affiché ou garder une vieille version de la page.
   // On le ferme : un onglet neuf s'ouvrira au prochain morceau.
   if (!opening) {
-    log("Ancien onglet du lecteur fermé");
+    log(t("logStaleTab"));
     browser.tabs.remove(port.sender.tab.id);
     return;
   }
@@ -329,7 +328,7 @@ function connectPlayer(port) {
     if (playerPort !== port) return;
     playerPort = null;
     playerState = -1;
-    log("Onglet du lecteur fermé");
+    log(t("logTabClosed"));
     update();
   });
   for (const cmd of queued) port.postMessage(cmd);
@@ -361,7 +360,7 @@ async function focusPlayer(toggle = false) {
 function play(i, opts = {}) {
   if (i < 0 || i >= items().length) return;
   state.index = i;
-  log(`Lecture : ${items()[i].title}`);
+  log(t("logPlaying", items()[i].title));
   send({ action: "load", id: items()[i].id, volume: state.volume, ...opts });
   update();
   save();
@@ -370,35 +369,29 @@ function play(i, opts = {}) {
 function onPlayerMessage(msg) {
   switch (msg.type) {
     case "ready":
-      log("✓ Lecteur prêt");
+      log(t("logReady"));
       break;
     case "log":
-      log(msg.text);
+      log(t(msg.key));
       break;
     case "hello":
-      log(`Lecture automatique : ${msg.autoplay}`);
+      log(t("logAutoplay", msg.autoplay));
       if (msg.autoplay === "allowed") {
-        backToBrowsing();
+        // On reste sur l'onglet le temps que la vidéo démarre : masquer l'onglet pendant
+        // le tout premier chargement semble parfois faire échouer YouTube
+        clearTimeout(returnAfterStart);
+        returnAfterStart = setTimeout(() => {
+          returnAfterStart = null;
+          backToBrowsing();
+        }, 6000);
       } else {
-        notice = {
-          text:
-            "Clique sur « Activer le son » dans l'onglet Sidetrack (une fois par session). " +
-            "Pour ne plus avoir à le faire : dans cet onglet, cadenas de la barre d'adresse → " +
-            "Lecture automatique → Autoriser l'audio et la vidéo.",
-          focus: true,
-        };
+        notice = { key: "noticeUnlock", focus: true };
         update();
       }
       break;
     case "blocked":
-      log("🔇 Son bloqué par Firefox");
-      notice = {
-        text:
-          "Firefox bloque le son tant que tu n'as pas cliqué dans l'onglet Sidetrack. " +
-          "Clique sur « Activer le son » dans cet onglet. Pour ne plus jamais avoir à le faire : " +
-          "dans cet onglet, cadenas de la barre d'adresse → Lecture automatique → Autoriser l'audio et la vidéo.",
-        focus: true,
-      };
+      log(t("logBlocked"));
+      notice = { key: "noticeBlocked", focus: true };
       update();
       break;
     case "unblocked":
@@ -410,13 +403,18 @@ function onPlayerMessage(msg) {
       roomTick(msg);
       break;
     case "state":
-      log(`État du lecteur : ${STATE_NAMES[msg.state] ?? msg.state}`);
+      log(t("logState", STATE_NAMES[msg.state] ? t(STATE_NAMES[msg.state]) : msg.state));
       playerState = msg.state;
       roomTick(msg, true);
       if (msg.state === 0) onEnded();
       update();
       break;
     case "started":
+      if (returnAfterStart) {
+        clearTimeout(returnAfterStart);
+        returnAfterStart = null;
+        backToBrowsing();
+      }
       if (state.mode === "blind" && game.phase === "playing") {
         // Dernier chapitre en « durée du chapitre » : sa fin dépend de la durée de la vidéo
         if (game.clip == null && game.chapter) {
@@ -429,15 +427,10 @@ function onPlayerMessage(msg) {
     case "error":
       {
         const item = items()[state.index];
-        log(`✗ Erreur YouTube ${msg.code} sur ${item ? `« ${item.title} » (${item.id})` : "aucun morceau"}`);
+        log(t("logYoutubeError", msg.code, item ? `« ${item.title} » (${item.id})` : t("logNoTrack")));
       }
       if (msg.code === "playlist-empty") {
-        notice = {
-          text:
-            "Impossible de lire cette playlist. Elle est sûrement privée (ou c'est « À regarder plus tard », " +
-            "« J'aime » ou un Mix) : le lecteur intégré ne voit pas ton compte YouTube. " +
-            "Passe-la en « Non répertoriée » sur YouTube puis réessaie.",
-        };
+        notice = { key: "noticePrivatePlaylist" };
         update();
         break;
       }
@@ -446,7 +439,7 @@ function onPlayerMessage(msg) {
       break;
     case "playlist": {
       const p = playlist(importTarget) ?? playlist();
-      log(`✓ Playlist importée : ${msg.ids.length} vidéos`);
+      log(t("logImported", msg.ids.length));
       const start = p.items.length;
       addItems(p, msg.ids);
       if (state.mode === "listen" && p.id === state.current) play(start);
@@ -516,7 +509,7 @@ async function startGame() {
     rounds = list.flatMap((item, i) =>
       item.chapters.length ? item.chapters.map((_, chapter) => ({ i, chapter })) : [{ i }]
     );
-    log(`Partie par chapitres : ${rounds.length} manches`);
+    log(t("logChapterGame", rounds.length));
   }
   game.order = shuffle(rounds);
   nextRound();
@@ -619,7 +612,7 @@ const actions = {
   // lance la vidéo à cet instant pour tout le salon
   playRef: (ref) => {
     const i = items().findIndex((item) => item.id === ref.id);
-    if (i < 0) return log("Cette vidéo n'est plus dans la playlist");
+    if (i < 0) return log(t("logNotInPlaylist"));
     if (i === state.index && playerPort) send({ action: "seek", time: ref.start ?? 0 });
     else play(i, { start: ref.start ?? 0 });
   },
@@ -659,6 +652,13 @@ const actions = {
     update();
     save();
   },
+  setSetting: (key, value) => {
+    if (!["lang", "showMulti"].includes(key)) return;
+    state[key] = value;
+    if (key === "lang") setLang(value);
+    update();
+    save();
+  },
   dismissNotice: () => {
     notice = null;
     update();
@@ -677,7 +677,8 @@ browser.storage.local.get("sidetrack").then((s) => {
     }
     state = { ...state, ...s.sidetrack, blind };
   }
-  if (!state.playlists.length) newPlaylist("Ma playlist");
+  setLang(state.lang);
+  if (!state.playlists.length) newPlaylist(t("defaultPlaylist"));
   if (!playlist()) state.current = state.playlists[0].id;
   state.index = -1;
   update();

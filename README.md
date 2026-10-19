@@ -16,6 +16,8 @@ A Firefox extension to build local playlists from YouTube links and play them in
 - Reorder the queue by drag and drop, unfold a video's chapters and start from any of them
 - **Rooms**: private (join by code or link) or public (listed in the sidebar). Invite friends with a link (no install needed, peer-to-peer). Watch together in sync with a chat; guests suggest videos, chapters or moments, the host plays them for everyone. In blind test, guesses stay private until the reveal and the host awards the points
 - Export a playlist to YouTube (no login or API key needed, 50 videos per link)
+- Settings page (⚙): language, hide multiplayer if you only play solo, log
+- English and French (automatic, or chosen in the settings); guests pick their own language
 - Everything is stored locally in Firefox
 
 ## Try it

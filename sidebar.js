@@ -4,16 +4,24 @@
 const $ = (s) => document.querySelector(s);
 
 const port = browser.runtime.connect({ name: "sidebar" });
-let view = null; // { state, game, playerState, notice, log, room }
+let view = null; // { state, game, playerState, notice, log, room, rooms }
 
 function act(cmd, ...args) {
   port.postMessage({ cmd, args });
 }
 
+let translated = false;
 port.onMessage.addListener((snap) => {
   view = snap;
+  // Langue : traduction des textes fixes au premier état reçu, puis à chaque changement
+  if (setLang(view.state.lang) || !translated) {
+    translated = true;
+    applyI18n();
+  }
   render();
 });
+
+$("#version").textContent = browser.runtime.getManifest().version;
 
 function items() {
   const { playlists, current } = view.state;
@@ -68,7 +76,7 @@ $("#pl-delete").addEventListener("click", (e) => {
     act("deletePlaylist");
     return;
   }
-  btn.textContent = "Sûr ?";
+  btn.textContent = t("sure");
   btn.classList.add("danger");
   deleteArmed = setTimeout(disarm, 3000);
 });
@@ -81,38 +89,69 @@ $("#add").addEventListener("submit", (e) => {
   $("#url").value = "";
 });
 
-// --- Salon -----------------------------------------------------------------
+// --- Réglages --------------------------------------------------------------
 
-$("#room-open").addEventListener("click", () => {
-  const isPublic = $("#room-public").checked;
-  act("openRoom", { isPublic, name: isPublic ? $("#room-name").value : "" });
-});
+function showSettings(open) {
+  $("#main").hidden = open;
+  $("#settings").hidden = !open;
+}
+
+$("#open-settings").addEventListener("click", () => showSettings(true));
+$("#close-settings").addEventListener("click", () => showSettings(false));
+$("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
+$("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
+
+// --- Multijoueur -------------------------------------------------------------
+
+// Un seul sous-formulaire ouvert à la fois : créer, rejoindre ou parcourir
+let multiPanel = null;
+const PANELS = { create: "#create-form", join: "#join-form", browse: "#browse" };
+
+function openPanel(name) {
+  multiPanel = multiPanel === name ? null : name;
+  for (const [key, sel] of Object.entries(PANELS)) {
+    $(sel).hidden = key !== multiPanel;
+    $(`#multi-${key}`).classList.toggle("on", key === multiPanel);
+  }
+  if (multiPanel === "join") $("#join-code").focus();
+  if (multiPanel === "browse") act("refreshPublicRooms");
+}
+
+for (const name of Object.keys(PANELS)) {
+  $(`#multi-${name}`).addEventListener("click", () => openPanel(name));
+}
+
+// Le nom du salon ne sert qu'à la liste publique : il n'apparaît qu'avec « Public »
 $("#room-public").addEventListener("change", (e) => {
   $("#room-name").hidden = !e.target.checked;
   if (e.target.checked) $("#room-name").focus();
 });
-// La liste se charge à l'ouverture de la section, puis à la demande
-$("#public-rooms").addEventListener("toggle", (e) => {
-  if (e.target.open) act("refreshPublicRooms");
+$("#create-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const isPublic = $("#room-public").checked;
+  act("openRoom", { isPublic, name: isPublic ? $("#room-name").value : "" });
+  openPanel(null);
 });
-$("#public-refresh").addEventListener("click", () => act("refreshPublicRooms"));
-$("#room-join").addEventListener("submit", (e) => {
+$("#join-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const code = $("#join-code").value.trim().toUpperCase();
   if (!code) return;
   act("joinRoom", code);
   $("#join-code").value = "";
+  openPanel(null);
 });
+$("#public-refresh").addEventListener("click", () => act("refreshPublicRooms"));
+
 $("#room-close").addEventListener("click", () => act("closeRoom"));
 $("#room-copy").addEventListener("click", async (e) => {
   const btn = e.currentTarget;
   try {
     await navigator.clipboard.writeText(view.room.link);
-    btn.textContent = "✓ Copié";
+    btn.textContent = t("copied");
   } catch {
     btn.textContent = view.room.link; // copie manuelle
   }
-  setTimeout(() => (btn.textContent = "🔗 Copier le lien"), 2000);
+  setTimeout(() => (btn.textContent = t("copyLink")), 2000);
 });
 $("#chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -166,10 +205,10 @@ function renderNotice() {
   const box = $("#notice");
   box.hidden = !view.notice;
   if (!view.notice) return;
-  box.textContent = view.notice.text;
+  box.textContent = t(view.notice.key, ...(view.notice.args ?? []));
   const row = box.appendChild(el("div"));
-  if (view.notice.focus) row.appendChild(button("Aller à l'onglet", () => act("focusPlayer")));
-  row.appendChild(button("OK", () => act("dismissNotice")));
+  if (view.notice.focus) row.appendChild(button(t("goToTab"), () => act("focusPlayer")));
+  row.appendChild(button(t("ok"), () => act("dismissNotice")));
 }
 
 // Texte de chat : les timecodes (1:23, 1:02:03) deviennent des boutons pour l'hôte
@@ -180,8 +219,7 @@ function chatText(parent, text) {
   for (const m of text.matchAll(TIMECODE)) {
     parent.append(text.slice(last, m.index));
     const seconds = (Number(m[1] ?? 0) * 60 + Number(m[2])) * 60 + Number(m[3]);
-    const b = parent.appendChild(button(m[0], () => act("seek", seconds), "tc"));
-    b.title = "Aller à ce moment pour tout le salon";
+    parent.appendChild(button(m[0], () => act("seek", seconds), "tc")).title = t("seekAll");
     last = m.index + m[0].length;
   }
   parent.append(text.slice(last));
@@ -190,18 +228,18 @@ function chatText(parent, text) {
 function renderPublicRooms() {
   const { list, loading, at } = view.rooms;
   $("#public-status").textContent = loading
-    ? "Recherche…"
+    ? t("searching")
     : !at
       ? ""
       : list.length
-        ? `${list.length} salon(s) ouvert(s)`
-        : "Aucun salon public pour l'instant";
+        ? t("roomsOpen", list.length)
+        : t("noRooms");
   $("#public-list").replaceChildren(
     ...list.map((r) => {
       const li = el("li");
-      const name = li.appendChild(el("span", `${r.mode === "blind" ? "❓" : "🎧"} ${r.name}`, "name"));
+      const name = li.appendChild(el("span", `${r.mode === "blind" ? "❓" : "🎵"} ${r.name}`, "name"));
       name.title = `${r.name} (${r.code})`;
-      li.append(el("span", `${r.players} 👤`, "muted"), button("Rejoindre", () => act("joinRoom", r.code)));
+      li.append(el("span", `${r.players} 👤`, "muted"), button(t("join"), () => act("joinRoom", r.code)));
       return li;
     })
   );
@@ -209,14 +247,21 @@ function renderPublicRooms() {
 
 function renderRoom(blind) {
   const room = view.room;
-  $("#room-start").hidden = !!room;
+  $("#multi").hidden = !view.state.showMulti && !room;
+  $("#multi-bar").hidden = !!room;
   $("#room-panel").hidden = !room;
-  if (!room) return renderPublicRooms();
+  if (room) {
+    for (const sel of Object.values(PANELS)) $(sel).hidden = true;
+  } else {
+    for (const [key, sel] of Object.entries(PANELS)) $(sel).hidden = key !== multiPanel;
+    return renderPublicRooms();
+  }
 
   $("#room-code").textContent = room.code;
   $("#room-public-badge").hidden = !room.public;
+  if (!$("#room-copy").textContent.startsWith("✓")) $("#room-copy").textContent = t("copyLink");
   $("#room-status").textContent =
-    room.status === "opening" ? "ouverture…" : room.status === "error" ? "⚠ connexion impossible" : `${room.players.length} invité(s)`;
+    room.status === "opening" ? t("roomOpening") : room.status === "error" ? t("roomError") : t("guests", room.players.length);
 
   $("#room-players").replaceChildren(
     ...room.players.map((p) => {
@@ -233,13 +278,13 @@ function renderRoom(blind) {
   const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
   chat.replaceChildren(
     ...room.chat.map((msg) => {
-      if (msg.system) return el("p", msg.text, "system");
+      if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "system");
       const p = el("p", null, msg.private ? "private" : "");
       if (msg.private) p.append("🔒 ");
-      p.append(el("b", `${msg.name} : `));
+      p.append(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
       if (msg.text) chatText(p, msg.text);
       if (msg.ref) {
-        const label = `▶ ${msg.ref.label || "vidéo"}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
+        const label = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
         p.append(button(label, () => act("playRef", msg.ref), "ref"));
       }
       // En blind test, l'hôte donne les points directement depuis une proposition
@@ -253,46 +298,47 @@ function renderRoom(blind) {
 function renderBlind(game, n, multi) {
   const status = $("#blind-status");
   const actions = $("#blind-actions");
+  const total = game.order.length;
   const round = multi
-    ? `Manche ${game.pos + 1}/${game.order.length}`
-    : `Manche ${game.pos + 1}/${game.order.length} · Score ${game.score}/${game.played}`;
+    ? t("round", game.pos + 1, total)
+    : `${t("round", game.pos + 1, total)} · ${t("score", game.score, game.played)}`;
 
   switch (game.phase) {
     case "idle":
-      status.textContent = n ? `${n} morceau${n > 1 ? "x" : ""} dans la playlist.` : "Playlist vide.";
-      actions.replaceChildren(button("▶ Démarrer la partie", () => act("startGame")));
+      status.textContent = n ? t("tracks", n) : t("emptyShort");
+      actions.replaceChildren(button(t("startGame"), () => act("startGame")));
       actions.firstChild.disabled = !n;
       break;
     case "loading":
-      status.textContent = "Chargement des chapitres…";
+      status.textContent = t("loadingChapters");
       actions.replaceChildren();
       break;
     case "playing":
       status.textContent = round;
-      actions.replaceChildren(button("👁 Révéler", () => act("reveal")), button("⏭ Passer", () => act("nextRound")));
+      actions.replaceChildren(button(t("reveal"), () => act("reveal")), button(t("skip"), () => act("nextRound")));
       break;
     case "timeup":
-      status.textContent = `${round} · Temps écoulé !`;
-      actions.replaceChildren(button("👁 Révéler", () => act("reveal")));
+      status.textContent = `${round} · ${t("timeUpBang")}`;
+      actions.replaceChildren(button(t("reveal"), () => act("reveal")));
       break;
     case "revealed":
-      status.textContent = multi ? `${round} · Donne les points avec +1` : round;
+      status.textContent = multi ? `${round} · ${t("givePoints")}` : round;
       actions.replaceChildren(
         ...(multi
-          ? [button("⏭ Manche suivante", () => act("nextRound"))]
+          ? [button(t("nextRound"), () => act("nextRound"))]
           : [
-              button("✓ Trouvé", () => act("answer", true), "good"),
-              button("✗ Raté", () => act("answer", false), "bad"),
+              button(t("found"), () => act("answer", true), "good"),
+              button(t("missed"), () => act("answer", false), "bad"),
             ])
       );
       break;
     case "over":
-      status.textContent = "Partie terminée";
+      status.textContent = t("gameOver");
       if (!multi) {
         status.append(" : ");
         status.appendChild(el("strong", `${game.score}/${game.played}`));
       }
-      actions.replaceChildren(button("↻ Rejouer", () => act("startGame")));
+      actions.replaceChildren(button(t("replay"), () => act("startGame")));
       break;
   }
   $("#blind-settings").hidden = !["idle", "over"].includes(game.phase);
@@ -338,7 +384,7 @@ function renderQueue(index) {
           else expanded.add(item.id);
           render();
         })
-      ).title = "Chapitres";
+      ).title = t("chapters");
       const title = row.appendChild(el("span", item.title));
       title.title = item.title;
       row.addEventListener("click", () => act("play", i));
@@ -348,18 +394,18 @@ function renderQueue(index) {
           act("removeItem", i);
         }, "del")
       );
-      del.title = "Retirer de la playlist";
+      del.title = t("removeItem");
 
       if (open) {
         const list = li.appendChild(el("ul", null, "chapters"));
         if (!Array.isArray(item.chapters)) {
-          list.appendChild(el("li", "Chargement des chapitres…", "muted"));
+          list.appendChild(el("li", t("loadingChapters"), "muted"));
           if (!chaptersAsked.has(item.id)) {
             chaptersAsked.add(item.id);
             act("loadChapters", i);
           }
         } else if (!item.chapters.length) {
-          list.appendChild(el("li", "Pas de chapitres", "muted"));
+          list.appendChild(el("li", t("noChapters"), "muted"));
         } else {
           for (const c of item.chapters) {
             const crow = list.appendChild(el("li")).appendChild(el("div", null, "row"));
@@ -413,14 +459,14 @@ function render() {
   $("#show-player").hidden = blind && !multi;
   $("#mask").hidden = !(secret && state.blind.hideVideo);
   $("#mask-time").textContent =
-    game.phase === "timeup" ? "Temps écoulé" : game.clip ? formatTime(game.remaining) : "";
+    game.phase === "timeup" ? t("timeUp") : game.clip ? formatTime(game.remaining) : "";
   // Une fois révélé (ou pour l'arbitre), en partie par chapitres, la réponse est le titre du chapitre
   const answer =
     blind && (multi || game.phase === "revealed") && game.chapter?.title
       ? `${game.chapter.title} · ${current?.title ?? ""}`
       : current?.title;
   const timer = blind && multi && game.phase === "playing" && game.clip ? ` · ${formatTime(game.remaining)}` : "";
-  $("#now").textContent = secret ? "Morceau mystère" : (answer ?? "Rien en lecture") + timer;
+  $("#now").textContent = secret ? t("mystery") : (answer ?? t("nothingPlaying")) + timer;
 
   $("#toggle").textContent = view.playerState === 1 ? "⏸" : "▶";
   $("#shuffle").classList.toggle("on", state.shuffle);
@@ -431,6 +477,8 @@ function render() {
   if (document.activeElement !== $("#startMode")) $("#startMode").value = state.blind.startMode;
   $("#hideVideo").checked = state.blind.hideVideo;
 
+  $("#lang").value = state.lang ?? "auto";
+  $("#show-multi").checked = state.showMulti !== false;
   $("#log").textContent = view.log.join("\n");
 
   if (blind) renderBlind(game, items().length, multi);

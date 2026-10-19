@@ -3,6 +3,125 @@
 const ROOM_PREFIX = "sidetrack-room-";
 const $ = (s) => document.querySelector(s);
 
+// --- Traductions -------------------------------------------------------------
+
+const STRINGS = {
+  fr: {
+    intro: "Rejoins le salon pour écouter ou jouer au blind test ensemble.",
+    codeLabel: "Code du salon",
+    nameLabel: "Ton pseudo",
+    joinButton: "Rejoindre",
+    connecting: "Connexion…",
+    notFound: "Salon introuvable : vérifie le code, ou l'hôte a fermé le salon.",
+    cantConnect: "Connexion impossible ({0}).",
+    room: "Salon",
+    volume: "Volume",
+    shareMoment: "📍 Partager ce moment",
+    shareMomentHelp: "Envoyer ce moment de la vidéo dans le chat",
+    hostPlaylist: "Playlist de l'hôte",
+    hostPlaylistHelp: "· clique pour proposer dans le chat",
+    chatPlaceholder: "Écris ici (ta réponse en blind test)",
+    send: "Envoyer",
+    disconnected: "Déconnecté de l'hôte",
+    closed: "L'hôte a fermé le salon",
+    players: "{0} joueur(s)",
+    waiting: "En attente d'une vidéo…",
+    chapters: "Chapitres",
+    proposeVideo: "Proposer cette vidéo dans le chat",
+    proposeChapter: "Proposer ce chapitre dans le chat",
+    video: "vidéo",
+    host: "Hôte",
+    yourGuess: "🔒 Ta réponse : {0}",
+    someoneGuessed: "🔒 {0} a proposé une réponse",
+    timeUp: "Temps écoulé",
+    round: "Manche {0}/{1}",
+    blindIdle: "En attente de la partie…",
+    blindLoading: "La partie va commencer…",
+    blindPlaying: "Morceau mystère : écris ta réponse dans le chat !",
+    blindTimeup: "Temps écoulé !",
+    blindRevealed: "Réponse : {0}",
+    blindOver: "Partie terminée",
+    chatJoined: "{0} a rejoint le salon",
+    chatLeft: "{0} est parti",
+    chatPointPlus: "+{0} point pour {1} ({2})",
+    chatPointMinus: "{0} point pour {1} ({2})",
+  },
+  en: {
+    intro: "Join the room to listen or play blind test together.",
+    codeLabel: "Room code",
+    nameLabel: "Your nickname",
+    joinButton: "Join",
+    connecting: "Connecting…",
+    notFound: "Room not found: check the code, or the host closed the room.",
+    cantConnect: "Can't connect ({0}).",
+    room: "Room",
+    volume: "Volume",
+    shareMoment: "📍 Share this moment",
+    shareMomentHelp: "Send this moment of the video to the chat",
+    hostPlaylist: "Host's playlist",
+    hostPlaylistHelp: "· click to suggest it in the chat",
+    chatPlaceholder: "Type here (your answer in blind test)",
+    send: "Send",
+    disconnected: "Disconnected from the host",
+    closed: "The host closed the room",
+    players: "{0} player(s)",
+    waiting: "Waiting for a video…",
+    chapters: "Chapters",
+    proposeVideo: "Suggest this video in the chat",
+    proposeChapter: "Suggest this chapter in the chat",
+    video: "video",
+    host: "Host",
+    yourGuess: "🔒 Your answer: {0}",
+    someoneGuessed: "🔒 {0} made a guess",
+    timeUp: "Time's up",
+    round: "Round {0}/{1}",
+    blindIdle: "Waiting for the game…",
+    blindLoading: "The game is about to start…",
+    blindPlaying: "Mystery track: type your answer in the chat!",
+    blindTimeup: "Time's up!",
+    blindRevealed: "Answer: {0}",
+    blindOver: "Game over",
+    chatJoined: "{0} joined the room",
+    chatLeft: "{0} left",
+    chatPointPlus: "+{0} point for {1} ({2})",
+    chatPointMinus: "{0} point for {1} ({2})",
+  },
+};
+
+let LANG = "en";
+try {
+  LANG = localStorage.getItem("sidetrack-lang") ?? "";
+} catch {}
+if (!STRINGS[LANG]) LANG = navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en";
+
+function t(key, ...args) {
+  const text = STRINGS[LANG][key] ?? STRINGS.en[key] ?? key;
+  return text.replace(/\{(\d)\}/g, (_, i) => String(args[i] ?? ""));
+}
+
+function applyI18n() {
+  document.documentElement.lang = LANG;
+  for (const e of document.querySelectorAll("[data-i18n]")) e.textContent = t(e.dataset.i18n);
+  for (const e of document.querySelectorAll("[data-i18n-title]")) e.title = t(e.dataset.i18nTitle);
+  for (const e of document.querySelectorAll("[data-i18n-placeholder]")) e.placeholder = t(e.dataset.i18nPlaceholder);
+  for (const b of document.querySelectorAll("#langs button")) b.classList.toggle("on", b.dataset.lang === LANG);
+}
+
+for (const b of document.querySelectorAll("#langs button")) {
+  b.addEventListener("click", () => {
+    LANG = b.dataset.lang;
+    try {
+      localStorage.setItem("sidetrack-lang", LANG);
+    } catch {}
+    applyI18n();
+    if (room) render();
+    renderChat();
+  });
+}
+applyI18n();
+
+// --- État ----------------------------------------------------------------------
+
 let peer = null;
 let conn = null;
 let me = null;
@@ -36,12 +155,13 @@ $("#login-form").addEventListener("submit", (e) => {
   join(code, name);
 });
 
+// text : message d'erreur, ou null pendant la connexion
 function loginError(text) {
   $("#login-error").textContent = text;
   $("#login-error").hidden = !text;
   const btn = $("#login-form button");
   btn.disabled = !text;
-  btn.textContent = text ? "Rejoindre" : "Connexion…";
+  btn.textContent = text ? t("joinButton") : t("connecting");
 }
 
 function join(code, name) {
@@ -52,13 +172,10 @@ function join(code, name) {
     conn = peer.connect(ROOM_PREFIX + code, { reliable: true, serialization: "json" });
     conn.on("open", () => conn.send({ t: "hello", name }));
     conn.on("data", onData);
-    conn.on("close", () => setStatus("Déconnecté de l'hôte"));
+    conn.on("close", () => setStatus(t("disconnected")));
   });
   peer.on("error", (e) => {
-    const text =
-      e.type === "peer-unavailable"
-        ? "Salon introuvable : vérifie le code, ou l'hôte a fermé le salon."
-        : `Connexion impossible (${e.type}).`;
+    const text = e.type === "peer-unavailable" ? t("notFound") : t("cantConnect", e.type);
     if (joined) setStatus(text);
     else loginError(text);
   });
@@ -113,7 +230,7 @@ function onData(msg) {
       latency = (performance.now() - msg.at) / 2000;
       break;
     case "closed":
-      setStatus("L'hôte a fermé le salon");
+      setStatus(t("closed"));
       $("#chat-input").disabled = true;
       player?.pauseVideo?.();
       break;
@@ -204,16 +321,15 @@ function renderChat() {
   const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
   box.replaceChildren(
     ...chat.map((msg) => {
-      if (msg.system) return el("p", msg.text, "system");
+      // Messages système : clés traduites ici, dans la langue de l'invité
+      if (msg.system) return el("p", msg.key ? t(msg.key, ...(msg.args ?? [])) : msg.text ?? "", "system");
       if (msg.masked) {
-        return msg.mine
-          ? el("p", `🔒 Ta réponse : ${msg.mine}`, "masked")
-          : el("p", `🔒 ${msg.name} a proposé une réponse`, "masked");
+        return msg.mine ? el("p", t("yourGuess", msg.mine), "masked") : el("p", t("someoneGuessed", msg.name), "masked");
       }
       const p = el("p");
-      p.append(el("b", `${msg.name} : `), msg.text ?? "");
+      p.append(el("b", `${msg.from === "host" ? t("host") : msg.name} : `), msg.text ?? "");
       if (msg.ref) {
-        p.append(el("span", `▶ ${msg.ref.label || "vidéo"}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, "ref"));
+        p.append(el("span", `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, "ref"));
       }
       return p;
     })
@@ -231,7 +347,7 @@ function renderQueue() {
       if (item.chapters?.length) {
         const open = expanded.has(item.id);
         const toggle = row.appendChild(el("button", open ? "▾" : "▸"));
-        toggle.title = "Chapitres";
+        toggle.title = t("chapters");
         toggle.addEventListener("click", (e) => {
           e.stopPropagation();
           if (open) expanded.delete(item.id);
@@ -243,13 +359,13 @@ function renderQueue() {
           for (const c of item.chapters) {
             const crow = list.appendChild(el("li")).appendChild(el("div", null, "row"));
             crow.append(el("time", formatTime(c.start)), el("span", c.title));
-            crow.title = "Proposer ce chapitre dans le chat";
+            crow.title = t("proposeChapter");
             crow.addEventListener("click", () => sendRef({ id: item.id, start: c.start, label: c.title }));
           }
         }
       }
       const title = row.appendChild(el("span", item.title));
-      row.title = "Proposer cette vidéo dans le chat";
+      row.title = t("proposeVideo");
       title.title = item.title;
       row.addEventListener("click", () => sendRef({ id: item.id, start: 0, label: item.title }));
       return li;
@@ -265,7 +381,7 @@ function render() {
       return li;
     })
   );
-  setStatus(`${room.players.length} joueur(s)`);
+  setStatus(t("players", room.players.length));
 
   const blind = room.blind;
   $("#playlist").hidden = !!blind;
@@ -274,7 +390,7 @@ function render() {
 
   if (!blind) {
     $("#mask").hidden = true;
-    $("#now").textContent = room.title ?? "En attente d'une vidéo…";
+    $("#now").textContent = room.title ?? t("waiting");
     renderQueue();
     return;
   }
@@ -282,14 +398,14 @@ function render() {
   // Blind test : vidéo masquée tant que la réponse n'est pas révélée
   $("#mask").hidden = !blind.hideVideo || blind.phase === "revealed";
   $("#mask-time").textContent =
-    blind.phase === "timeup" ? "Temps écoulé" : blind.phase === "playing" && blind.clip ? formatTime(blind.remaining) : "";
+    blind.phase === "timeup" ? t("timeUp") : blind.phase === "playing" && blind.clip ? formatTime(blind.remaining) : "";
   $("#now").textContent = {
-    idle: "En attente de la partie…",
-    loading: "La partie va commencer…",
-    playing: "Morceau mystère : écris ta réponse dans le chat !",
-    timeup: "Temps écoulé !",
-    revealed: `Réponse : ${blind.answer ?? "?"}`,
-    over: "Partie terminée",
+    idle: t("blindIdle"),
+    loading: t("blindLoading"),
+    playing: t("blindPlaying"),
+    timeup: t("blindTimeup"),
+    revealed: t("blindRevealed", blind.answer ?? "?"),
+    over: t("blindOver"),
   }[blind.phase];
-  $("#blind-status").textContent = blind.total && blind.phase !== "idle" ? `Manche ${blind.round}/${blind.total}` : "";
+  $("#blind-status").textContent = blind.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
 }

@@ -27,8 +27,11 @@ function makeCode() {
 function openRoom({ isPublic = false, name = "" } = {}) {
   if (room) return;
   log(
-    `Création du salon : PeerJS ${typeof Peer === "function" ? "chargé" : "ABSENT"}, ` +
-      `WebRTC ${typeof RTCPeerConnection === "function" ? "disponible" : "ABSENT"}`
+    t(
+      "logRoomDiag",
+      typeof Peer === "function" ? t("loaded") : t("missing"),
+      typeof RTCPeerConnection === "function" ? t("available") : t("missing")
+    )
   );
   const code = makeCode();
   const peer = new Peer(ROOM_PREFIX + code);
@@ -37,7 +40,7 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     link: `${JOIN_URL}#${code}`,
     status: "opening",
     public: isPublic,
-    name: String(name).trim().slice(0, 40) || "Salon Sidetrack",
+    name: String(name).trim().slice(0, 40) || "Sidetrack",
     peer,
     players: new Map(),
     chat: [],
@@ -46,7 +49,7 @@ function openRoom({ isPublic = false, name = "" } = {}) {
 
   peer.on("open", () => {
     room.status = "open";
-    log(`Salon ${code} ouvert${room.public ? " (public)" : ""}`);
+    log(t(room.public ? "logRoomOpenPublic" : "logRoomOpen", code));
     if (room.public) startAnnouncing();
     update();
   });
@@ -63,7 +66,7 @@ function openRoom({ isPublic = false, name = "" } = {}) {
       room = null;
       return openRoom({ isPublic, name });
     }
-    log(`Salon : erreur ${e.type}`);
+    log(t("logRoomError", e.type));
     if (["network", "server-error", "socket-error", "browser-incompatible"].includes(e.type)) {
       room.status = "error";
       update();
@@ -76,7 +79,7 @@ function openRoom({ isPublic = false, name = "" } = {}) {
 // (il faut voir la vidéo et cliquer dans la page pour avoir le son)
 function joinRoom(code) {
   code = String(code).toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (code.length !== 5) return log("✗ Code de salon invalide (5 caractères)");
+  if (code.length !== 5) return log(t("logBadCode"));
   send({ action: "pause" }); // notre propre musique laisse la place au salon
   browser.tabs.create({ url: `${JOIN_URL}#${code}` });
 }
@@ -88,7 +91,7 @@ function closeRoom() {
   const { peer } = room;
   room = null;
   setTimeout(() => peer.destroy(), 300); // laisse partir le message de fermeture
-  log("Salon fermé");
+  log(t("logRoomClosed"));
   update();
 }
 
@@ -107,7 +110,7 @@ function acceptPlayer(conn) {
     const p = room?.players.get(conn.peer);
     if (!p) return;
     room.players.delete(conn.peer);
-    systemMessage(`${p.name} est parti`);
+    systemMessage("chatLeft", p.name);
   });
 }
 
@@ -116,12 +119,12 @@ function onPlayerData(conn, msg) {
   const player = room.players.get(conn.peer);
 
   if (msg.t === "hello" && !player) {
-    const name = String(msg.name ?? "").trim().slice(0, 24) || "Invité";
+    const name = String(msg.name ?? "").trim().slice(0, 24) || t("defaultGuest");
     room.players.set(conn.peer, { id: conn.peer, name, score: 0, conn });
     conn.send({ t: "welcome", code: room.code, chat: room.chat.map(publicChat) });
     conn.send(publicState());
     if (lastSync) conn.send(lastSync);
-    systemMessage(`${name} a rejoint le salon`);
+    systemMessage("chatJoined", name);
     return;
   }
   if (!player) return;
@@ -164,17 +167,19 @@ function addChat(entry) {
 }
 
 function publicChat(msg) {
-  const { id, at, from, name, system, ref } = msg;
+  const { id, at, from, name, system, key, args, ref } = msg;
   if (msg.private) return { id, at, from, name, masked: true };
-  return { id, at, from, name, system, text: msg.text, ref };
+  return { id, at, from, name, system, key, args, text: msg.text, ref };
 }
 
-function systemMessage(text) {
-  if (room) addChat({ system: true, text });
+// Message système : envoyé comme clé de traduction, chacun le lit dans sa langue
+function systemMessage(key, ...args) {
+  if (room) addChat({ system: true, key, args });
 }
 
+// Le nom « Hôte » est traduit à l'affichage (from === "host")
 function hostChat(text, ref = null) {
-  if (room) addChat({ from: "host", name: "Hôte", text: String(text).slice(0, 300), ref });
+  if (room) addChat({ from: "host", name: "", text: String(text).slice(0, 300), ref });
 }
 
 // À la révélation, les propositions de la manche deviennent visibles de tous
@@ -191,7 +196,7 @@ function award(playerId, delta = 1) {
   const p = room?.players.get(playerId);
   if (!p) return;
   p.score += delta;
-  systemMessage(delta > 0 ? `+${delta} point pour ${p.name} (${p.score})` : `${delta} point pour ${p.name} (${p.score})`);
+  systemMessage(delta > 0 ? "chatPointPlus" : "chatPointMinus", delta, p.name, p.score);
 }
 
 // --- État partagé avec les invités -------------------------------------------
@@ -296,7 +301,7 @@ function publishAnnouncement(content, ttl) {
     announceKey
   );
   Promise.allSettled(pool().publish(NOSTR_RELAYS, event)).then((results) => {
-    if (!results.some((r) => r.status === "fulfilled")) log("✗ Annonce du salon : aucun relais n'a répondu");
+    if (!results.some((r) => r.status === "fulfilled")) log(t("logAnnounceFailed"));
   });
 }
 
@@ -368,7 +373,7 @@ async function refreshPublicRooms() {
     publicRooms.list = list.sort((a, b) => b.at - a.at);
     publicRooms.at = Date.now();
   } catch (e) {
-    log(`✗ Liste des salons : ${e.message}`);
+    log(t("logRoomsError", e.message));
   }
   publicRooms.loading = false;
   update();
