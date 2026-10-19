@@ -207,8 +207,7 @@ function send(cmd) {
 
 let returnTabId = null;
 
-// Ouvre l'onglet du lecteur, ou recharge celui qui existe déjà
-// (après un rechargement de l'extension, son ancien pont est déconnecté).
+// Ouvre un onglet neuf pour le lecteur, en fermant un éventuel ancien onglet déconnecté.
 // Il passe au premier plan : Firefox ne lance aucun média dans un onglet jamais affiché.
 async function openPlayerTab() {
   if (opening) return;
@@ -216,12 +215,9 @@ async function openPlayerTab() {
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
   returnTabId = active?.id ?? null;
   const [tab] = await browser.tabs.query({ url: "https://tom-tour.github.io/sidetrack/player/*" });
-  if (tab) {
-    await browser.tabs.update(tab.id, { active: true });
-    browser.tabs.reload(tab.id);
-  } else {
-    browser.tabs.create({ url: PLAYER_URL, pinned: true, active: true });
-  }
+  if (tab) await browser.tabs.remove(tab.id);
+  // Paramètre anti-cache : GitHub Pages garde les fichiers jusqu'à 10 minutes
+  browser.tabs.create({ url: `${PLAYER_URL}?t=${Date.now()}`, pinned: true, active: true });
 }
 
 // Revient à l'onglet où l'on naviguait avant l'ouverture du lecteur
@@ -231,6 +227,14 @@ function backToBrowsing() {
 }
 
 function connectPlayer(port) {
+  // Firefox réinjecte le pont dans les onglets déjà ouverts quand l'extension est rechargée :
+  // un tel onglet peut n'avoir jamais été affiché ou garder une vieille version de la page.
+  // On le ferme : un onglet neuf s'ouvrira au prochain morceau.
+  if (!opening) {
+    log("Ancien onglet du lecteur fermé");
+    browser.tabs.remove(port.sender.tab.id);
+    return;
+  }
   clearTimeout(opening);
   opening = null;
   playerPort = port;
