@@ -22,10 +22,28 @@ let stallRestarts = 0;
 const unlock = document.getElementById("unlock");
 const cover = document.getElementById("cover");
 
-// Les deux seuls textes de la page, dans la langue du navigateur
+// Textes de la page, dans la langue du navigateur
 const TEXT = navigator.language.toLowerCase().startsWith("fr")
-  ? { unlock: "🔊 Activer le son", orphan: "Sidetrack n'est plus actif : tu peux fermer cet onglet." }
-  : { unlock: "🔊 Enable sound", orphan: "Sidetrack is no longer active: you can close this tab." };
+  ? {
+      title: "Sidetrack est presque prêt",
+      click: "Clique sur « Lancer Sidetrack » : Firefox n'autorise le son qu'après un clic dans la page. Cet onglet se cache ensuite tout seul et reste prêt jusqu'à la fermeture de Firefox.",
+      autoplay: "Pour ne plus jamais voir cet écran : cadenas de la barre d'adresse → Lecture automatique → « Autoriser l'audio et la vidéo ».",
+      hide: "Si Firefox signale qu'une extension masque des onglets, garde-les masqués : c'est cet onglet qui joue la musique en coulisse.",
+      unlock: "🔊 Lancer Sidetrack",
+      orphan: "Sidetrack n'est plus actif : tu peux fermer cet onglet.",
+    }
+  : {
+      title: "Sidetrack is almost ready",
+      click: "Click “Launch Sidetrack”: Firefox only allows sound after a click in the page. This tab then hides itself and stays ready until Firefox closes.",
+      autoplay: "To never see this screen again: padlock in the address bar → Autoplay → “Allow Audio and Video”.",
+      hide: "If Firefox says an extension is hiding tabs, keep them hidden: this tab plays the music behind the scenes.",
+      unlock: "🔊 Launch Sidetrack",
+      orphan: "Sidetrack is no longer active: you can close this tab.",
+    };
+document.getElementById("setup-title").textContent = TEXT.title;
+document.getElementById("step-click").textContent = TEXT.click;
+document.getElementById("step-autoplay").textContent = TEXT.autoplay;
+document.getElementById("step-hide").textContent = TEXT.hide;
 unlock.querySelector("button").textContent = TEXT.unlock;
 
 function send(msg) {

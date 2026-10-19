@@ -54,6 +54,7 @@ function save() {
 // --- Liaison avec la barre latérale ---------------------------------------
 
 const ports = new Set();
+let prepared = false; // onglet du lecteur préparé pour cette session
 let updateScheduled = null;
 
 function snapshot() {
@@ -80,6 +81,12 @@ browser.runtime.onConnect.addListener((port) => {
   if (port.name === "player") return connectPlayer(port);
   if (port.name !== "sidebar") return;
   ports.add(port);
+  // Première ouverture du panneau de la session : l'onglet du lecteur se prépare tout de suite
+  // (écran « Lancer Sidetrack » si Firefox exige un clic), avant même la première vidéo
+  if (!prepared) {
+    prepared = true;
+    warmPlayer();
+  }
   port.onDisconnect.addListener(() => ports.delete(port));
   port.onMessage.addListener(async ({ cmd, args = [] }) => {
     // Une erreur dans une commande serait sinon invisible : on la met au journal
@@ -285,6 +292,7 @@ function send(cmd) {
   if (cmd.action === "load") {
     loadingSince = Date.now();
     setTimeout(update, LOADING_MAX + 100);
+    syncCover(); // cache posé avant que la vidéo n'apparaisse
   }
   if (playerPort) return playerPort.postMessage(cmd);
   // Sans onglet, seul un chargement justifie d'en ouvrir un
@@ -377,7 +385,7 @@ function warmPlayer() {
 }
 
 // Cache sur la vidéo, dans la page du lecteur : en blind test, rien n'est dévoilé même si
-// l'onglet s'affiche (premier chargement, clic sur « Activer le son », nouvel essai…)
+// l'onglet s'affiche (premier chargement, clic sur « Lancer Sidetrack », nouvel essai…)
 function videoHidden() {
   if (inGuestRoom()) return guestHidesVideo();
   return state.mode === "blind" && !room && state.blind.hideVideo && game.phase !== "revealed";
@@ -400,7 +408,7 @@ async function hidePlayerTab() {
 
 // Affiche l'onglet du lecteur ; s'il est déjà affiché et que toggle est vrai, revient à la navigation
 async function focusPlayer(toggle = false) {
-  // 📺 est inactif en blind test solo ; seul le message « Activer le son » peut y emmener.
+  // 📺 est inactif en blind test solo ; seul l'écran « Lancer Sidetrack » peut y emmener.
   // Dans un salon, l'hôte est l'arbitre : il garde l'accès à la vidéo ; un invité la voit
   // quand l'hôte ne la cache pas.
   const hidden = inGuestRoom() ? guestHidesVideo() : state.mode === "blind" && !room;

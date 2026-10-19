@@ -26,10 +26,11 @@ A Firefox extension to build local playlists from YouTube links and play them in
 1. Open `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on…** and pick `manifest.json`
 3. Toggle the sidebar with `Alt+Shift+Y`
+4. The first time you open it in a Firefox session, a Sidetrack tab shows up: click **Launch Sidetrack** (Firefox only allows sound after a click in the page). The tab then hides itself and stays ready until Firefox closes. To skip this step for good, allow autoplay for that tab (padlock in the address bar → Autoplay → Allow Audio and Video)
 
 ## How it works
 
-YouTube refuses to play embedded videos inside extension pages, so the player lives on a tiny static page served by GitHub Pages (`player/`). The sidebar shows that page in an iframe and drives it with `postMessage`. Your playlists never leave your browser.
+YouTube refuses to play embedded videos inside extension pages, so the player lives on a tiny static page served by GitHub Pages (`player/`). It plays in a hidden tab, driven by the extension through a content script and `postMessage`, so the music keeps going with the sidebar closed; the sidebar is a remote control. In blind test the page covers the video itself, so nothing is revealed even if the tab shows up. Your playlists never leave your browser.
 
 Rooms use [PeerJS](https://peerjs.com) (bundled in `vendor/`): its public server only introduces the browsers to each other, then everything goes peer-to-peer. Guests join through `join/`, also served by GitHub Pages, or straight from the extension (`guest.js`, same protocol).
 

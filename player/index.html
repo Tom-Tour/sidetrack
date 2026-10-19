@@ -17,18 +17,35 @@
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
       background: #111; color: #fff; font-size: 96px; font-weight: 700;
     }
+    #unlock .card { max-width: 520px; margin: 16px; padding: 24px 28px; border-radius: 12px; background: #1c1b22; color: #fbfbfe; }
+    #unlock h1 { margin: 0 0 12px; font-size: 22px; }
+    #unlock ol { margin: 0 0 20px; padding-left: 22px; line-height: 1.45; }
+    #unlock li { margin: 8px 0; }
+    #unlock li span { color: #a3a3ad; }
     #unlock button {
-      font: inherit; font-size: 20px; padding: 16px 28px; cursor: pointer;
+      display: block; width: 100%; font: inherit; font-size: 20px; padding: 14px 28px; cursor: pointer;
       color: #fff; background: #0061e0; border: 0; border-radius: 8px;
     }
+    #unlock button:hover { background: #0250bb; }
   </style>
 </head>
 <body>
   <div id="player"></div>
   <div id="cover" hidden>?</div>
-  <div id="unlock" hidden><button></button></div>
+  <!-- Écran de préparation : le clic sur le bouton est ce qui autorise le son pour la session -->
+  <div id="unlock" hidden>
+    <div class="card">
+      <h1 id="setup-title"></h1>
+      <ol>
+        <li id="step-click"></li>
+        <li id="step-autoplay"></li>
+        <li id="step-hide"></li>
+      </ol>
+      <button></button>
+    </div>
+  </div>
   <!-- Version à incrémenter à chaque modification de player.js (cache de GitHub Pages) -->
-  <script src="player.js?v=11"></script>
+  <script src="player.js?v=12"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
