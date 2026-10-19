@@ -205,14 +205,29 @@ function send(cmd) {
   openPlayerTab();
 }
 
+let returnTabId = null;
+
 // Ouvre l'onglet du lecteur, ou recharge celui qui existe déjà
 // (après un rechargement de l'extension, son ancien pont est déconnecté).
+// Il passe au premier plan : Firefox ne lance aucun média dans un onglet jamais affiché.
 async function openPlayerTab() {
   if (opening) return;
   opening = setTimeout(() => (opening = null), 10000);
+  const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+  returnTabId = active?.id ?? null;
   const [tab] = await browser.tabs.query({ url: "https://tom-tour.github.io/sidetrack/player/*" });
-  if (tab) browser.tabs.reload(tab.id);
-  else browser.tabs.create({ url: PLAYER_URL, pinned: true, active: false });
+  if (tab) {
+    await browser.tabs.update(tab.id, { active: true });
+    browser.tabs.reload(tab.id);
+  } else {
+    browser.tabs.create({ url: PLAYER_URL, pinned: true, active: true });
+  }
+}
+
+// Revient à l'onglet où l'on naviguait avant l'ouverture du lecteur
+function backToBrowsing() {
+  if (returnTabId != null) browser.tabs.update(returnTabId, { active: true }).catch(() => {});
+  returnTabId = null;
 }
 
 function connectPlayer(port) {
@@ -250,6 +265,21 @@ function onPlayerMessage(msg) {
     case "ready":
       log("✓ Lecteur prêt");
       break;
+    case "hello":
+      log(`Lecture automatique : ${msg.autoplay}`);
+      if (msg.autoplay === "allowed") {
+        backToBrowsing();
+      } else {
+        notice = {
+          text:
+            "Clique sur « Activer le son » dans l'onglet Sidetrack épinglé (une fois par session). " +
+            "Pour ne plus avoir à le faire : dans cet onglet, cadenas de la barre d'adresse → " +
+            "Lecture automatique → Autoriser l'audio et la vidéo.",
+          focus: true,
+        };
+        update();
+      }
+      break;
     case "blocked":
       log("🔇 Son bloqué par Firefox");
       notice = {
@@ -263,6 +293,7 @@ function onPlayerMessage(msg) {
       break;
     case "unblocked":
       notice = null;
+      backToBrowsing();
       update();
       break;
     case "state":

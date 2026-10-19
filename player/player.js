@@ -16,10 +16,17 @@ function send(msg) {
 
 unlock.addEventListener("click", () => {
   unlock.hidden = true;
-  player.unMute();
-  player.playVideo();
+  if (player?.playVideo) {
+    player.unMute();
+    if (player.getPlayerState() === YT.PlayerState.PAUSED) player.playVideo();
+  }
   send({ type: "unblocked" });
 });
+
+// Sans clic dans cette page, Firefox refuse le son : on propose le clic tout de suite.
+const autoplay = navigator.getAutoplayPolicy?.("mediaelement") ?? "unknown";
+if (autoplay !== "allowed") unlock.hidden = false;
+send({ type: "hello", autoplay });
 
 window.onYouTubeIframeAPIReady = () => {
   player = new YT.Player("player", {
