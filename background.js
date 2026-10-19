@@ -267,9 +267,17 @@ function connectPlayer(port) {
   queued = [];
 }
 
+// En blind test, la vidéo ne doit pas rester sous les yeux
+async function hidePlayerTab() {
+  if (playerTabId == null) return;
+  const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (active?.id === playerTabId) backToBrowsing();
+}
+
 // Affiche l'onglet du lecteur ; s'il est déjà affiché et que toggle est vrai, revient à la navigation
 async function focusPlayer(toggle = false) {
-  if (playerTabId == null || !playerPort) return;
+  // 📺 est inactif en blind test ; seul le message « Activer le son » peut y emmener
+  if (playerTabId == null || !playerPort || (toggle && state.mode === "blind")) return;
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
   if (active?.id === playerTabId) {
     if (toggle) backToBrowsing();
@@ -456,11 +464,12 @@ function answer(found) {
   nextRound();
 }
 
+// Changer de mode ne coupe pas la musique : seul « Démarrer la partie » lance le blind test.
 function setMode(mode) {
   if (state.mode === mode) return;
   state.mode = mode;
   resetGame();
-  send({ action: "pause" });
+  if (mode === "blind") hidePlayerTab();
   update();
   save();
 }

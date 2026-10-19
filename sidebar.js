@@ -197,16 +197,18 @@ function render() {
   $("#listen").hidden = blind;
   $("#blind").hidden = !blind;
 
-  // Miniature du morceau (la vidéo est dans l'onglet masqué), cachée pendant une manche
+  // Miniature du morceau (la vidéo est dans l'onglet masqué). En blind test, aperçu noir
+  // sauf une fois la réponse révélée (ou pendant la manche si on ne masque pas la vidéo).
   const current = items()[state.index];
   const art = $("#art");
-  const showArt = current && !(secret && state.blind.hideVideo);
+  const showArt =
+    current && (!blind || game.phase === "revealed" || (secret && !state.blind.hideVideo));
   art.hidden = !showArt;
   if (showArt) {
     const src = `https://i.ytimg.com/vi/${current.id}/mqdefault.jpg`;
     if (art.src !== src) art.src = src;
   }
-  $("#show-player").disabled = secret;
+  $("#show-player").hidden = blind;
   $("#mask").hidden = !(secret && state.blind.hideVideo);
   $("#mask-time").textContent =
     game.phase === "timeup" ? "Temps écoulé" : state.blind.clip ? formatTime(game.remaining) : "";
