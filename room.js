@@ -1,6 +1,7 @@
 // Salon multijoueur : l'extension est l'hôte, les invités se connectent en pair-à-pair
 // (PeerJS ; son serveur public ne sert qu'à mettre les navigateurs en relation).
-// Les invités utilisent la page join/ sur GitHub Pages, sans rien installer.
+// Les invités utilisent la page join/ sur GitHub Pages, sans rien installer, ou leur
+// propre extension (guest.js).
 //
 // L'hôte choisit les vidéos et arbitre : en blind test, les propositions tapées dans le
 // chat ne sont visibles que de lui pendant la manche, et c'est lui qui donne les points.
@@ -87,7 +88,7 @@ const nowSeconds = () => Math.floor(Date.now() / 1000);
 const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 function openRoom({ isPublic = false, name = "" } = {}) {
-  if (room) return;
+  if (room || inGuestRoom()) return;
   log(
     t(
       "logRoomDiag",
@@ -142,15 +143,6 @@ function openRoom({ isPublic = false, name = "" } = {}) {
     }
   });
   update();
-}
-
-// Rejoindre le salon de quelqu'un : la page invité s'ouvre dans un onglet visible
-// (il faut voir la vidéo et cliquer dans la page pour avoir le son)
-function joinRoom(code) {
-  code = roomName(code);
-  if (!ROOM_NAME.test(code)) return log(t("logBadCode"));
-  send({ action: "pause" }); // notre propre musique laisse la place au salon
-  browser.tabs.create({ url: `${JOIN_URL}#${code}` });
 }
 
 function closeRoom() {

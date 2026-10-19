@@ -71,6 +71,18 @@
     </div>
     </div>
 
+    <!-- Invité dans le salon de quelqu'un : c'est l'hôte qui choisit la musique -->
+    <section id="guest" hidden>
+      <div id="guest-status"></div>
+      <div id="guest-listen">
+        <div class="line">
+          <span class="muted" data-i18n="hostPlaylist"></span>
+          <button id="share-moment" data-i18n="shareMoment" data-i18n-title="shareMomentHelp"></button>
+        </div>
+        <ol id="guest-queue"></ol>
+      </div>
+    </section>
+
     <section id="listen">
       <div class="controls">
         <button id="prev" data-i18n-title="prev">⏮</button>
@@ -132,6 +144,9 @@
       <label><input type="checkbox" id="show-multi"> <span data-i18n="showMulti"></span></label>
       <p class="muted" data-i18n="showMultiHelp"></p>
       <label><input type="checkbox" id="chat-sound"> <span data-i18n="chatSound"></span></label>
+      <label><span data-i18n="nickname"></span>
+        <input type="text" id="nickname" maxlength="24" autocomplete="off">
+      </label>
       <p class="muted" data-i18n="ipNotice"></p>
     </fieldset>
     <fieldset>

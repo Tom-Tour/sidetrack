@@ -12,7 +12,7 @@
     "https://www.youtube.com/*",
     "https://tom-tour.github.io/*"
   ],
-  "background": { "scripts": ["vendor/peerjs.min.js", "vendor/nostr.bundle.js", "i18n.js", "background.js", "room.js"] },
+  "background": { "scripts": ["vendor/peerjs.min.js", "vendor/nostr.bundle.js", "i18n.js", "background.js", "room.js", "guest.js"] },
   "content_scripts": [
     {
       "matches": ["https://tom-tour.github.io/sidetrack/player/*"],

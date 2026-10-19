@@ -1,4 +1,5 @@
-// Moteur de Sidetrack : playlists, lecteur et blind test (le salon multijoueur est dans room.js).
+// Moteur de Sidetrack : playlists, lecteur et blind test (le salon multijoueur est dans room.js,
+// la participation au salon de quelqu'un d'autre dans guest.js).
 // Tourne en arrière-plan pour que la musique continue barre latérale fermée.
 // La barre latérale n'est qu'une télécommande reliée par un port.
 //
@@ -24,6 +25,7 @@ let state = {
   lang: "auto",        // "auto" | "fr" | "en"
   showMulti: true,     // bouton 🌐 du salon (désactivable dans les réglages pour un usage solo)
   chatSound: false,    // petit son à chaque nouveau message du salon
+  nickname: "",        // pseudo dans les salons des autres
   banned: {},          // identité (clé publique) → dernier nom connu : refusés dans nos salons
 };
 
@@ -52,7 +54,7 @@ const ports = new Set();
 let updateScheduled = null;
 
 function snapshot() {
-  return { state, game, playerState, notice, log: logLines, room: roomSnapshot(), rooms: publicRoomsSnapshot() };
+  return { state, game, playerState, notice, log: logLines, room: roomSnapshot(), guest: guestSnapshot(), rooms: publicRoomsSnapshot() };
 }
 
 // Regroupe les mises à jour (un import de playlist en déclenche des centaines)
@@ -347,8 +349,10 @@ async function hidePlayerTab() {
 // Affiche l'onglet du lecteur ; s'il est déjà affiché et que toggle est vrai, revient à la navigation
 async function focusPlayer(toggle = false) {
   // 📺 est inactif en blind test solo ; seul le message « Activer le son » peut y emmener.
-  // Dans un salon, l'hôte est l'arbitre : il garde l'accès à la vidéo.
-  if (playerTabId == null || !playerPort || (toggle && state.mode === "blind" && !room)) return;
+  // Dans un salon, l'hôte est l'arbitre : il garde l'accès à la vidéo ; un invité la voit
+  // quand l'hôte ne la cache pas.
+  const hidden = inGuestRoom() ? guestHidesVideo() : state.mode === "blind" && !room;
+  if (playerTabId == null || !playerPort || (toggle && hidden)) return;
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
   if (active?.id === playerTabId) {
     if (toggle) backToBrowsing();
@@ -360,7 +364,8 @@ async function focusPlayer(toggle = false) {
 }
 
 function play(i, opts = {}) {
-  if (i < 0 || i >= items().length) return;
+  // Invité d'un salon : c'est l'hôte qui choisit la musique
+  if (inGuestRoom() || i < 0 || i >= items().length) return;
   state.index = i;
   log(t("logPlaying", items()[i].title));
   send({ action: "load", id: items()[i].id, volume: state.volume, ...opts });
@@ -403,12 +408,14 @@ function onPlayerMessage(msg) {
       break;
     case "tick":
       roomTick(msg);
+      guestTick(msg);
       break;
     case "state":
       log(t("logState", STATE_NAMES[msg.state] ? t(STATE_NAMES[msg.state]) : msg.state));
       playerState = msg.state;
       roomTick(msg, true);
-      if (msg.state === 0) onEnded();
+      guestTick(msg);
+      if (msg.state === 0 && !inGuestRoom()) onEnded();
       update();
       break;
     case "started":
@@ -431,6 +438,7 @@ function onPlayerMessage(msg) {
         const item = items()[state.index];
         log(t("logYoutubeError", msg.code, item ? `« ${item.title} » (${item.id})` : t("logNoTrack")));
       }
+      if (inGuestRoom()) break; // la suite dépend de l'hôte
       if (msg.code === "playlist-empty") {
         notice = { key: "noticePrivatePlaylist" };
         update();
@@ -641,6 +649,10 @@ const actions = {
   refreshPublicRooms: () => refreshPublicRooms(),
   closeRoom: () => closeRoom(),
   joinRoom: (code) => joinRoom(code),
+  leaveRoom: () => leaveRoom(),
+  guestChat: (text) => guestChat(text),
+  guestRef: (ref) => guestRef(ref),
+  shareMoment: () => shareMoment(),
   hostChat: (text) => hostChat(text),
   award: (playerId, delta) => award(playerId, delta),
   kick: (playerId) => kick(playerId, false),
@@ -681,8 +693,8 @@ const actions = {
     save();
   },
   setSetting: (key, value) => {
-    if (!["lang", "showMulti", "chatSound"].includes(key)) return;
-    state[key] = value;
+    if (!["lang", "showMulti", "chatSound", "nickname"].includes(key)) return;
+    state[key] = key === "nickname" ? cleanText(value, 24) : value;
     if (key === "lang") setLang(value);
     update();
     save();

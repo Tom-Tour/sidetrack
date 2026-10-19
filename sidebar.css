@@ -51,7 +51,7 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .controls { display: flex; gap: 4px; }
 .controls button { flex: 1; }
 
-#queue, #host-queue { margin: 8px 0 0; padding-left: 24px; }
+#queue, #host-queue, #guest-queue { margin: 8px 0 0; padding-left: 24px; }
 #host-tracks { margin-top: 8px; }
 #host-tracks .line span { flex: 1; }
 #host-queue { max-height: 260px; overflow-y: auto; }
@@ -60,7 +60,7 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .row { display: flex; align-items: center; gap: 2px; padding: 2px 4px; border-radius: 3px; cursor: pointer; }
 .row span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row:hover { background: var(--card); }
-#queue > li.current > .row, #host-queue > li.current > .row { background: var(--active); font-weight: 600; }
+#queue > li.current > .row, #host-queue > li.current > .row, #guest-queue > li.current > .row { background: var(--active); font-weight: 600; }
 .row button { padding: 0 4px; border: 0; background: none; color: var(--muted); }
 .row .del { visibility: hidden; }
 .row:hover .del { visibility: visible; }
@@ -110,7 +110,12 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 #chat { height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 4px; background: var(--card); }
 #chat p { margin: 2px 0; overflow-wrap: anywhere; }
 #chat .system { color: var(--muted); font-style: italic; }
-#chat .private { color: var(--accent); }
+#chat .private, #chat .masked { color: var(--accent); }
+#chat .ref.plain { cursor: default; }
+#room-players li.me { font-weight: 600; }
+#guest .line span { flex: 1; }
+#guest-queue { max-height: 300px; overflow-y: auto; }
+#settings input[type=text] { width: 100%; box-sizing: border-box; margin-top: 2px; }
 #chat .ref, #chat .tc { color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 10px; margin: 0 2px; }
 #chat-form { display: flex; gap: 4px; margin-top: 4px; }
 #chat-input { flex: 1; min-width: 0; }

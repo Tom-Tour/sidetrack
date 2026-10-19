@@ -101,6 +101,7 @@ $("#close-settings").addEventListener("click", () => showSettings(false));
 $("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
 $("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
 $("#chat-sound").addEventListener("change", (e) => act("setSetting", "chatSound", e.target.checked));
+$("#nickname").addEventListener("change", (e) => act("setSetting", "nickname", e.target.value));
 
 // --- Salon -------------------------------------------------------------------
 
@@ -167,14 +168,15 @@ $("#room-form").addEventListener("submit", (e) => {
 $("#room-name").addEventListener("input", () => render());
 $("#public-refresh").addEventListener("click", () => act("refreshPublicRooms"));
 
-$("#room-close").addEventListener("click", () => act("closeRoom"));
+$("#room-close").addEventListener("click", () => act(view.guest ? "leaveRoom" : "closeRoom"));
+$("#share-moment").addEventListener("click", () => act("shareMoment"));
 $("#room-copy").addEventListener("click", async (e) => {
   const btn = e.currentTarget;
   try {
-    await navigator.clipboard.writeText(view.room.link);
+    await navigator.clipboard.writeText((view.room ?? view.guest).link);
     btn.textContent = t("copied");
   } catch {
-    btn.textContent = view.room.link; // copie manuelle
+    btn.textContent = (view.room ?? view.guest).link; // copie manuelle
   }
   setTimeout(() => (btn.textContent = t("copyLink")), 2000);
 });
@@ -182,7 +184,7 @@ $("#chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("#chat-input").value.trim();
   if (!text) return;
-  act("hostChat", text);
+  act(view.guest ? "guestChat" : "hostChat", text);
   $("#chat-input").value = "";
 });
 
@@ -270,8 +272,41 @@ function renderPublicRooms() {
   );
 }
 
+// Ligne de chat. Hôte : timecodes et vidéos proposées cliquables (pour tout le salon),
+// indice « probable », +1. Invité : propositions masquées pendant une manche.
+function chatLine(msg, { guest, blind }) {
+  if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "system");
+  if (msg.masked) return el("p", msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", msg.name), "masked");
+  const p = el("p", null, msg.private ? "private" : "");
+  if (msg.private) p.append("🔒 ");
+  const who = p.appendChild(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
+  if (msg.color) who.style.color = msg.color;
+  if (msg.text) {
+    if (guest) p.append(msg.text);
+    else chatText(p, msg.text);
+  }
+  // Aide à l'arbitrage : la proposition ressemble au titre
+  if (msg.hint) p.appendChild(el("span", t("probable"), "hint")).title = t("probableTitle");
+  if (msg.ref) {
+    const label = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
+    p.append(guest ? el("span", label, "ref plain") : button(label, () => act("playRef", msg.ref), "ref"));
+  }
+  // En blind test, l'hôte donne les points directement depuis une proposition
+  if (!guest && blind && msg.from !== "host") p.append(button("+1", () => act("award", msg.from, 1)));
+  return p;
+}
+
+function guestStatus(g) {
+  if (g.status === "connecting") return t("guestConnecting");
+  if (g.status === "proof") return t("guestProof", g.tries);
+  if (g.status === "ended") return t(g.endKey, ...(g.endArgs ?? []));
+  return t("players", g.players.length);
+}
+
+// Notre salon (hôte) ou celui de quelqu'un d'autre (invité) : même panneau
 function renderRoom(blind) {
-  const room = view.room;
+  const guest = view.guest;
+  const room = view.room ?? guest;
   // Le salon s'affiche au-dessus des onglets : les deux lignes, ou le chat une fois dedans
   // À l'ouverture d'un salon, le chat s'affiche ; 🌐 permet ensuite de le replier
   if (room && !hadRoom) roomOpen = true;
@@ -282,7 +317,8 @@ function renderRoom(blind) {
   $("#toggle-room").classList.toggle("on", roomOpen);
 
   // Messages des autres : badge de non-lus sur 🌐 quand le chat est replié, son en option
-  const others = room ? room.chat.filter((m) => !m.system && m.from !== "host") : [];
+  const me = guest ? guest.me : "host";
+  const others = room ? room.chat.filter((m) => !m.system && m.from !== me) : [];
   const latest = others.length ? others[others.length - 1].id : 0;
   if (roomOpen && !$("#main").hidden) lastSeenId = latest;
   const unread = others.filter((m) => m.id > lastSeenId).length;
@@ -292,6 +328,7 @@ function renderRoom(blind) {
     if (lastHeardId && view.state.chatSound) beep();
     lastHeardId = latest;
   }
+  if (!room) lastSeenId = lastHeardId = 0; // un autre salon recommence sa numérotation
 
   $("#online").hidden = !roomOpen;
   $("#room-panel").hidden = !room;
@@ -307,16 +344,26 @@ function renderRoom(blind) {
   $("#room-code").textContent = room.code;
   $("#room-public-badge").hidden = !room.public;
   if (!$("#room-copy").textContent.startsWith("✓")) $("#room-copy").textContent = t("copyLink");
-  $("#room-status").textContent =
-    room.status === "opening" ? t("roomOpening") : room.status === "error" ? t("roomError") : t("guests", room.players.length);
+  $("#room-close").title = t(guest ? "leaveRoom" : "closeRoom");
+  $("#room-status").textContent = guest
+    ? guestStatus(guest)
+    : room.status === "opening"
+      ? t("roomOpening")
+      : room.status === "error"
+        ? t("roomError")
+        : t("guests", room.players.length);
+  $("#chat-input").placeholder = t(guest ? "guestChatPlaceholder" : "chatPlaceholder");
+  $("#chat-input").disabled = !!guest && guest.status !== "joined";
 
-  // Pastilles des joueurs : couleur, score ; au survol, exclure ou bannir
+  // Pastilles des joueurs : couleur, score ; l'hôte peut, au survol, exclure ou bannir
+  const scores = guest ? !!guest.host?.blind : true;
   $("#room-players").replaceChildren(
     ...room.players.map((p) => {
-      const li = el("li");
+      const li = el("li", null, p.id === me ? "me" : "");
       const name = li.appendChild(el("span", p.name));
       name.style.color = p.color;
-      li.append(el("b", String(p.score)));
+      if (scores) li.append(el("b", String(p.score)));
+      if (guest) return li;
       if (blind) {
         li.append(button("+1", () => act("award", p.id, 1)), button("−1", () => act("award", p.id, -1)));
       }
@@ -328,26 +375,69 @@ function renderRoom(blind) {
 
   const chat = $("#chat");
   const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
-  chat.replaceChildren(
-    ...room.chat.map((msg) => {
-      if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "system");
-      const p = el("p", null, msg.private ? "private" : "");
-      if (msg.private) p.append("🔒 ");
-      const who = p.appendChild(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
-      if (msg.color) who.style.color = msg.color;
-      if (msg.text) chatText(p, msg.text);
-      // Aide à l'arbitrage : la proposition ressemble au titre
-      if (msg.hint) p.appendChild(el("span", t("probable"), "hint")).title = t("probableTitle");
-      if (msg.ref) {
-        const label = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
-        p.append(button(label, () => act("playRef", msg.ref), "ref"));
+  chat.replaceChildren(...room.chat.map((msg) => chatLine(msg, { guest: !!guest, blind })));
+  if (atBottom) chat.scrollTop = chat.scrollHeight;
+}
+
+// Invité : l'écran suit l'hôte (sa vidéo, son blind test) ; sa playlist sert à proposer dans le chat
+function renderGuest(g) {
+  const h = g.host;
+  const blind = h?.blind;
+  const hidden = !!blind && blind.hideVideo && blind.phase !== "revealed";
+  const art = $("#art");
+  art.hidden = !g.videoId || hidden;
+  if (!art.hidden) {
+    const src = `https://i.ytimg.com/vi/${g.videoId}/mqdefault.jpg`;
+    if (art.src !== src) art.src = src;
+  }
+  $("#show-player").hidden = hidden;
+  $("#mask").hidden = !hidden;
+  $("#mask-time").textContent =
+    blind?.phase === "timeup" ? t("timeUp") : blind?.phase === "playing" && blind.clip ? formatTime(blind.remaining) : "";
+  $("#now").textContent = !blind
+    ? h?.title ?? t("guestWaiting")
+    : {
+        idle: t("blindIdle"),
+        loading: t("blindLoading"),
+        playing: t("blindPlaying"),
+        timeup: t("timeUpBang"),
+        revealed: t("blindRevealed", blind.answer ?? "?"),
+        over: t("gameOver"),
+      }[blind.phase] ?? "";
+  $("#guest-status").textContent = blind?.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
+  $("#guest-listen").hidden = !h?.playlist;
+  if (!h?.playlist) return;
+  $("#share-moment").disabled = !g.videoId;
+  $("#guest-queue").replaceChildren(
+    ...h.playlist.map((item, i) => {
+      const li = el("li", null, i === h.index ? "current" : "");
+      const row = li.appendChild(el("div", null, "row"));
+      const key = `guest:${item.id}`;
+      if (item.chapters?.length) {
+        const open = expanded.has(key);
+        row.appendChild(
+          button(open ? "▾" : "▸", (e) => {
+            e.stopPropagation();
+            if (open) expanded.delete(key);
+            else expanded.add(key);
+            render();
+          })
+        ).title = t("chapters");
+        if (open) {
+          const list = li.appendChild(el("ul", null, "chapters"));
+          for (const c of item.chapters) {
+            const crow = list.appendChild(el("li")).appendChild(el("div", null, "row"));
+            crow.append(el("time", formatTime(c.start)), el("span", c.title));
+            crow.title = c.title;
+            crow.addEventListener("click", () => act("guestRef", { id: item.id, start: c.start, label: c.title }));
+          }
+        }
       }
-      // En blind test, l'hôte donne les points directement depuis une proposition
-      if (blind && msg.from !== "host") p.append(button("+1", () => act("award", msg.from, 1)));
-      return p;
+      row.appendChild(el("span", item.title)).title = item.title;
+      row.addEventListener("click", () => act("guestRef", { id: item.id, start: 0, label: item.title }));
+      return li;
     })
   );
-  if (atBottom) chat.scrollTop = chat.scrollHeight;
 }
 
 function renderBlind(game, n, multi) {
@@ -518,9 +608,18 @@ function render() {
   const secret = blind && !multi && ["playing", "timeup"].includes(game.phase);
   $("#mode-listen").classList.toggle("on", !blind);
   $("#mode-blind").classList.toggle("on", blind);
-  $("#listen").hidden = blind;
-  $("#blind").hidden = !blind;
   renderRoom(blind);
+  renderSettings(state);
+
+  // Invité d'un salon : pas de playlist à soi ni de blind test, on suit l'hôte
+  const guest = view.guest;
+  $("#add").hidden = !!guest;
+  $("#tabs").hidden = !!guest;
+  $("#guest").hidden = !guest;
+  $("#listen").hidden = !!guest || blind;
+  $("#blind").hidden = !!guest || !blind;
+  if (document.activeElement !== $("#volume")) $("#volume").value = String(state.volume ?? 100);
+  if (guest) return renderGuest(guest);
 
   // Miniature du morceau (la vidéo est dans l'onglet masqué). En blind test solo, aperçu noir
   // sauf une fois la réponse révélée (ou pendant la manche si on ne masque pas la vidéo).
@@ -547,13 +646,19 @@ function render() {
 
   $("#toggle").textContent = view.playerState === 1 ? "⏸" : "▶";
   $("#shuffle").classList.toggle("on", state.shuffle);
-  if (document.activeElement !== $("#volume")) $("#volume").value = String(state.volume ?? 100);
 
   $("#clip").querySelector('option[value="-1"]').disabled = state.blind.startMode !== "chapter";
   if (document.activeElement !== $("#clip")) $("#clip").value = String(state.blind.clip);
   if (document.activeElement !== $("#startMode")) $("#startMode").value = state.blind.startMode;
   $("#hideVideo").checked = state.blind.hideVideo;
 
+  $("#host-tracks").hidden = !(blind && multi);
+  if (blind && multi) renderHostTracks(game);
+  if (blind) renderBlind(game, items().length, multi);
+  else renderQueue(state.index);
+}
+
+function renderSettings(state) {
   $("#lang").value = state.lang ?? "auto";
   $("#show-multi").checked = state.showMulti !== false;
   $("#chat-sound").checked = !!state.chatSound;
@@ -568,10 +673,7 @@ function render() {
         })
       : [el("li", t("noBanned"), "muted")])
   );
+  if (document.activeElement !== $("#nickname")) $("#nickname").value = state.nickname ?? "";
+  $("#nickname").placeholder = t("defaultGuest");
   $("#log").textContent = view.log.join("\n");
-
-  $("#host-tracks").hidden = !(blind && multi);
-  if (blind && multi) renderHostTracks(game);
-  if (blind) renderBlind(game, items().length, multi);
-  else renderQueue(state.index);
 }
