@@ -27,6 +27,7 @@ let state = {
   showMulti: true,     // bouton 🌐 du salon (désactivable dans les réglages pour un usage solo)
   chatSound: false,    // petit son à chaque nouveau message du salon
   nickname: "",        // pseudo dans les salons des autres
+  hideTab: true,       // ranger l'onglet du lecteur hors de la barre d'onglets (tabs.hide)
   banned: {},          // identité (clé publique) → dernier nom connu : refusés dans nos salons
 };
 
@@ -338,7 +339,7 @@ browser.tabs.onActivated.addListener(({ tabId, previousTabId }) => {
     playerShown = shown;
     update();
   }
-  if (previousTabId != null && previousTabId === playerTabId) {
+  if (state.hideTab && previousTabId != null && previousTabId === playerTabId) {
     browser.tabs.hide(playerTabId).catch((e) => log(t("logHideError", e.message)));
   }
 });
@@ -373,6 +374,14 @@ function connectPlayer(port) {
   });
   for (const cmd of queued) port.postMessage(cmd);
   queued = [];
+}
+
+// Réglage changé : l'onglet du lecteur réapparaît dans la barre, ou s'y range s'il n'est pas affiché
+async function applyHideTab() {
+  if (playerTabId == null) return;
+  if (!state.hideTab) return browser.tabs.show(playerTabId).catch(() => {});
+  const [active] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (active?.id !== playerTabId) browser.tabs.hide(playerTabId).catch((e) => log(t("logHideError", e.message)));
 }
 
 // Ouvre l'onglet du lecteur d'avance, sans vidéo. Firefox ne lit les médias que dans un
@@ -815,8 +824,9 @@ const actions = {
     save();
   },
   setSetting: (key, value) => {
-    if (!["lang", "showMulti", "chatSound", "nickname"].includes(key)) return;
+    if (!["lang", "showMulti", "chatSound", "nickname", "hideTab"].includes(key)) return;
     state[key] = key === "nickname" ? cleanText(value, 24) : value;
+    if (key === "hideTab") applyHideTab();
     if (key === "lang") setLang(value);
     update();
     save();

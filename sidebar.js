@@ -101,6 +101,7 @@ $("#close-settings").addEventListener("click", () => showSettings(false));
 $("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
 $("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
 $("#chat-sound").addEventListener("change", (e) => act("setSetting", "chatSound", e.target.checked));
+$("#hide-tab").addEventListener("change", (e) => act("setSetting", "hideTab", e.target.checked));
 $("#nickname").addEventListener("change", (e) => act("setSetting", "nickname", e.target.value));
 
 // --- Salon -------------------------------------------------------------------
@@ -685,6 +686,7 @@ function renderSettings(state) {
   $("#lang").value = state.lang ?? "auto";
   $("#show-multi").checked = state.showMulti !== false;
   $("#chat-sound").checked = !!state.chatSound;
+  $("#hide-tab").checked = state.hideTab !== false;
   const banned = Object.entries(state.banned ?? {});
   $("#banned").replaceChildren(
     ...(banned.length
