@@ -140,6 +140,7 @@ async function answerChallenge(g, msg) {
   if (bits && !(proof && proof.bits >= bits)) {
     // Preuve pas encore prête : on ne fait pas attendre l'hôte, on revient quand elle l'est
     g.status = "proof";
+    g.powBits = bits;
     g.conn = null;
     g.peer.destroy();
     update();
@@ -319,6 +320,7 @@ function guestSnapshot() {
     link: `${JOIN_URL}#${g.code}`,
     status: g.status,
     tries: g.tries,
+    powBits: g.powBits ?? 0,
     endKey: g.endKey,
     endArgs: g.endArgs,
     me: g.me,

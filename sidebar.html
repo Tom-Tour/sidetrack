@@ -42,6 +42,7 @@
               <button id="room-copy" data-i18n-title="copyLinkTitle"></button>
               <button id="room-close" class="icon" data-i18n-title="closeRoom">✕</button>
             </div>
+            <progress id="room-progress" max="1" value="0" hidden></progress>
             <ul id="room-players"></ul>
             <div id="chat"></div>
             <form id="chat-form">
@@ -63,6 +64,7 @@
         <div id="mask-icon">?</div>
         <div id="mask-time"></div>
       </div>
+      <div id="loading" hidden data-i18n-title="loadingVideo"><div class="spinner"></div></div>
     </div>
     <div id="now"></div>
     <div id="volume-row">
@@ -97,14 +99,6 @@
     <section id="blind" hidden>
       <div id="blind-status"></div>
       <div id="blind-actions" class="controls"></div>
-      <!-- Hôte d'un salon : liste des pistes, clic = prochaine manche -->
-      <div id="host-tracks" hidden>
-        <div class="line">
-          <span id="host-tracks-title" class="muted"></span>
-          <button id="host-tracks-toggle"></button>
-        </div>
-        <ol id="host-queue"></ol>
-      </div>
       <fieldset id="blind-settings">
         <label><span data-i18n="clipLength"></span>
           <select id="clip">
@@ -123,8 +117,16 @@
             <option value="chapter" data-i18n="startChapter"></option>
           </select>
         </label>
-        <label><input type="checkbox" id="hideVideo"> <span data-i18n="hideVideo"></span></label>
+        <label><input type="checkbox" id="hideVideo"> <span id="hideVideo-label"></span></label>
       </fieldset>
+      <!-- Hôte d'un salon : liste des pistes, clic = prochaine manche -->
+      <div id="host-tracks" hidden>
+        <div class="line">
+          <span id="host-tracks-title" class="muted"></span>
+          <button id="host-tracks-toggle"></button>
+        </div>
+        <ol id="host-queue"></ol>
+      </div>
     </section>
   </main>
 

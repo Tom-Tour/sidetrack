@@ -265,7 +265,8 @@ function renderPublicRooms() {
     ...view.rooms.list.map((r) => {
       const li = el("li");
       li.title = t("join");
-      li.append(el("span", `${r.mode === "blind" ? "❓" : "🎵"} ${r.code}`, "name"), el("span", `${r.players} 👤`, "muted"));
+      const name = `${r.mode === "blind" ? "❓" : "🎵"} ${r.code}${r.game ? ` · ${t("gameInProgress")}` : ""}`;
+      li.append(el("span", name, "name"), el("span", `${r.players} 👤`, "muted"));
       li.addEventListener("click", () => act("joinRoom", r.code));
       return li;
     })
@@ -298,7 +299,7 @@ function chatLine(msg, { guest, blind }) {
 
 function guestStatus(g) {
   if (g.status === "connecting") return t("guestConnecting");
-  if (g.status === "proof") return t("guestProof", g.tries);
+  if (g.status === "proof") return t("guestProof");
   if (g.status === "ended") return t(g.endKey, ...(g.endArgs ?? []));
   return t("players", g.players.length);
 }
@@ -352,6 +353,10 @@ function renderRoom(blind) {
       : room.status === "error"
         ? t("roomError")
         : t("guests", room.players.length);
+  // Preuve de travail : nombre d'essais imprévisible, la barre avance vite puis ralentit
+  const proving = guest?.status === "proof";
+  $("#room-progress").hidden = !proving;
+  if (proving) $("#room-progress").value = 1 - Math.exp((-2 * guest.tries) / 2 ** (guest.powBits || 7));
   $("#chat-input").placeholder = t(guest ? "guestChatPlaceholder" : "chatPlaceholder");
   $("#chat-input").disabled = !!guest && guest.status !== "joined";
 
@@ -391,6 +396,8 @@ function renderGuest(g) {
     if (art.src !== src) art.src = src;
   }
   $("#show-player").hidden = hidden;
+  $("#show-player").classList.toggle("on", !!view.playerShown);
+  $("#loading").hidden = !view.loading;
   $("#mask").hidden = !hidden;
   $("#mask-time").textContent =
     blind?.phase === "timeup" ? t("timeUp") : blind?.phase === "playing" && blind.clip ? formatTime(blind.remaining) : "";
@@ -460,17 +467,23 @@ function renderBlind(game, n, multi) {
       break;
     case "playing":
       status.textContent = round;
-      actions.replaceChildren(button(t("reveal"), () => act("reveal")), button(t("skip"), () => act("nextRound")));
+      actions.replaceChildren(
+        ...(multi ? [playPause()] : []),
+        button(t("reveal"), () => act("reveal")),
+        button(t("skip"), () => act("nextRound"))
+      );
       break;
     case "timeup":
       status.textContent = `${round} · ${t("timeUpBang")}`;
-      actions.replaceChildren(button(t("reveal"), () => act("reveal")));
+      actions.replaceChildren(
+        ...(multi ? [playPause(), button(t("reveal"), () => act("reveal")), button(t("skip"), () => act("nextRound"))] : [button(t("reveal"), () => act("reveal"))])
+      );
       break;
     case "revealed":
       status.textContent = multi ? `${round} · ${t("givePoints")}` : round;
       actions.replaceChildren(
         ...(multi
-          ? [button(t("nextRound"), () => act("nextRound"))]
+          ? [playPause(), button(t("nextRound"), () => act("nextRound"))]
           : [
               button(t("found"), () => act("answer", true), "good"),
               button(t("missed"), () => act("answer", false), "bad"),
@@ -486,7 +499,15 @@ function renderBlind(game, n, multi) {
       actions.replaceChildren(button(t("replay"), () => act("startGame")));
       break;
   }
-  $("#blind-settings").hidden = !["idle", "over"].includes(game.phase);
+  $("#blind-settings").hidden = !multi && !["idle", "over"].includes(game.phase);
+  $("#hideVideo-label").textContent = t(multi ? "hideVideoGuests" : "hideVideo");
+}
+
+// Hôte d'un salon : lecture / pause du morceau de la manche (pour réécouter, faire durer…)
+function playPause() {
+  const b = button(view.playerState === 1 ? "⏸" : "▶", () => act("playPause"), "icon");
+  b.title = t("playPause");
+  return b;
 }
 
 // File de lecture : glisser-déposer pour réordonner, ▸ pour dérouler les chapitres
@@ -498,7 +519,7 @@ let dragging = false;
 // Blind test de l'hôte : clic = prochaine manche, pistes déjà jouées grisées, rien d'éditable.
 function trackList(index, { picking = false, played = new Set() } = {}) {
   return items().map((item, i) => {
-      const li = el("li", null, i === index ? "current" : played.has(`${i}`) ? "played" : "");
+      const li = el("li", null, i === index ? (view.loading ? "current loading" : "current") : played.has(`${i}`) ? "played" : "");
       li.draggable = !picking;
       li.addEventListener("dragstart", (e) => {
         dragging = true;
@@ -645,6 +666,8 @@ function render() {
   $("#now").textContent = secret ? t("mystery") : (answer ?? t("nothingPlaying")) + timer;
 
   $("#toggle").textContent = view.playerState === 1 ? "⏸" : "▶";
+  $("#loading").hidden = !view.loading;
+  $("#show-player").classList.toggle("on", !!view.playerShown);
   $("#shuffle").classList.toggle("on", state.shuffle);
 
   $("#clip").querySelector('option[value="-1"]').disabled = state.blind.startMode !== "chapter";

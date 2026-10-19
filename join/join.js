@@ -48,7 +48,7 @@ const STRINGS = {
     chatFlood: "{0} envoie trop de messages : sourdine pendant 1 minute",
     chatKicked: "{0} a été exclu du salon",
     chatBanned: "{0} a été banni",
-    preparing: "Préparation de ton identité anti-spam (une seule fois, quelques secondes)… {0} essais",
+    preparing: "Préparation de ton identité anti-spam (une seule fois)…",
     full: "Ce salon est complet (24 joueurs).",
     kicked: "L'hôte t'a exclu du salon.",
     banned: "L'hôte t'a banni de ses salons.",
@@ -98,7 +98,7 @@ const STRINGS = {
     chatFlood: "{0} is sending too many messages: muted for 1 minute",
     chatKicked: "{0} was kicked from the room",
     chatBanned: "{0} was banned",
-    preparing: "Preparing your anti-spam identity (only once, a few seconds)… {0} tries",
+    preparing: "Preparing your anti-spam identity (only once)…",
     full: "This room is full (24 players).",
     kicked: "The host kicked you from the room.",
     banned: "The host banned you from their rooms.",
@@ -203,7 +203,7 @@ function startMining(bits) {
     worker.onmessage = ({ data }) => {
       if (data.t === "progress") {
         job.tries = data.tries;
-        if (powWaiting) loginStatus(t("preparing", data.tries));
+        if (powWaiting) powProgress(data.tries, bits);
         return;
       }
       worker.terminate();
@@ -225,12 +225,21 @@ function startMining(bits) {
 // la progression (calculée une seule fois, souvent déjà finie grâce au calcul de fond)
 async function waitProof(bits) {
   powWaiting = true;
-  loginStatus(t("preparing", mining?.tries ?? 0));
+  loginStatus(t("preparing"));
+  powProgress(mining?.tries ?? 0, bits);
   try {
     return await startMining(bits);
   } finally {
     powWaiting = false;
+    $("#pow-progress").hidden = true;
   }
+}
+
+// Nombre d'essais imprévisible (en moyenne 2^bits) : la barre avance vite puis ralentit
+function powProgress(tries, bits) {
+  const bar = $("#pow-progress");
+  bar.hidden = false;
+  bar.value = 1 - Math.exp((-2 * tries) / 2 ** bits);
 }
 
 // Calcul lancé dès l'ouverture de la page, en arrière-plan : le temps de taper son pseudo,

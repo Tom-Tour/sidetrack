@@ -607,7 +607,8 @@ function publishAnnouncement(content, ttl) {
 }
 
 function announcement() {
-  return { code: room.code, players: room.players.size, mode: state.mode };
+  const inGame = state.mode === "blind" && !["idle", "over"].includes(game.phase);
+  return { code: room.code, players: room.players.size, mode: state.mode, game: inGame };
 }
 
 function announce() {
@@ -667,6 +668,7 @@ async function refreshPublicRooms() {
         code: c.code,
         players: Math.max(0, Number(c.players) || 0),
         mode: c.mode === "blind" ? "blind" : "listen",
+        game: c.game === true,
         at: e.created_at,
       });
     }

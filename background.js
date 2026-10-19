@@ -20,7 +20,8 @@ let state = {
   mode: "listen",      // "listen" | "blind"
   // startMode : "start" début du morceau | "random" moment aléatoire | "chapter" chapitre aléatoire
   // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
-  blind: { clip: 20, startMode: "random", hideVideo: true },
+  blind: { clip: -1, startMode: "chapter", hideVideo: true },
+  blindDefaults: 2,    // version des réglages par défaut du blind test (voir le démarrage)
   volume: 100,
   lang: "auto",        // "auto" | "fr" | "en"
   showMulti: true,     // bouton 🌐 du salon (désactivable dans les réglages pour un usage solo)
@@ -30,6 +31,8 @@ let state = {
 };
 
 let playerState = -1;  // -1 non démarré, 0 fini, 1 lecture, 2 pause, 5 prête
+let loadingSince = 0;  // vidéo demandée au lecteur, pas encore démarrée (indicateur de chargement)
+let playerShown = false; // onglet du lecteur affiché (bouton 📺 allumé)
 let importTarget = null;
 let notice = null;     // { key, args?, focus? } : traduit par la barre latérale
 let logLines = [];
@@ -54,7 +57,11 @@ const ports = new Set();
 let updateScheduled = null;
 
 function snapshot() {
-  return { state, game, playerState, notice, log: logLines, room: roomSnapshot(), guest: guestSnapshot(), rooms: publicRoomsSnapshot() };
+  const loading = !!loadingSince && Date.now() - loadingSince < LOADING_MAX;
+  return {
+    state, game, playerState, loading, playerShown, notice, log: logLines,
+    room: roomSnapshot(), guest: guestSnapshot(), rooms: publicRoomsSnapshot(),
+  };
 }
 
 // Regroupe les mises à jour (un import de playlist en déclenche des centaines)
@@ -271,7 +278,13 @@ let playerTabId = null;
 let queued = [];
 let opening = null;
 
+const LOADING_MAX = 30000; // au-delà, l'indicateur de chargement s'efface de lui-même
+
 function send(cmd) {
+  if (cmd.action === "load") {
+    loadingSince = Date.now();
+    setTimeout(update, LOADING_MAX + 100);
+  }
   if (playerPort) return playerPort.postMessage(cmd);
   // Sans onglet, seul un chargement justifie d'en ouvrir un
   if (cmd.action !== "load" && cmd.action !== "playlist") return;
@@ -308,7 +321,12 @@ async function backToBrowsing() {
 }
 
 // L'onglet du lecteur n'est visible que tant qu'on est dessus
-browser.tabs.onActivated.addListener(({ previousTabId }) => {
+browser.tabs.onActivated.addListener(({ tabId, previousTabId }) => {
+  const shown = tabId === playerTabId;
+  if (shown !== playerShown) {
+    playerShown = shown;
+    update();
+  }
   if (previousTabId != null && previousTabId === playerTabId) {
     browser.tabs.hide(playerTabId).catch((e) => log(t("logHideError", e.message)));
   }
@@ -327,11 +345,14 @@ function connectPlayer(port) {
   opening = null;
   playerPort = port;
   playerTabId = port.sender.tab.id;
+  playerShown = !!port.sender.tab.active;
   port.onMessage.addListener(onPlayerMessage);
   port.onDisconnect.addListener(() => {
     if (playerPort !== port) return;
     playerPort = null;
     playerState = -1;
+    loadingSince = 0;
+    playerShown = false;
     log(t("logTabClosed"));
     update();
   });
@@ -401,6 +422,7 @@ function onPlayerMessage(msg) {
       }
       break;
     case "blocked":
+      loadingSince = 0;
       // On reste sur l'onglet : c'est là qu'il faut cliquer
       clearTimeout(returnAfterStart);
       returnAfterStart = null;
@@ -427,6 +449,8 @@ function onPlayerMessage(msg) {
       break;
     case "started":
       retriedVisible = false;
+      loadingSince = 0;
+      update();
       // Le son revient juste au démarrage, et Firefox peut encore couper la lecture pendant
       // ~2 s : on reste sur l'onglet le temps que le départ soit acquis.
       if (returnAfterStart) {
@@ -446,6 +470,8 @@ function onPlayerMessage(msg) {
       }
       break;
     case "error":
+      loadingSince = 0;
+      update();
       {
         const item = items()[state.index];
         log(t("logYoutubeError", msg.code, item ? `« ${item.title} » (${item.id})` : t("logNoTrack")));
@@ -713,6 +739,8 @@ const actions = {
   next,
   prev,
   toggle,
+  // Blind test : lecture ou pause du morceau de la manche, sans toucher à la partie
+  playPause: () => send({ action: playerState === 1 ? "pause" : "play" }),
   toggleShuffle: () => {
     state.shuffle = !state.shuffle;
     update();
@@ -764,6 +792,12 @@ browser.storage.local.get("sidetrack").then((s) => {
       delete blind.randomStart;
     }
     state = { ...state, ...s.sidetrack, blind };
+    // Réglages par défaut du blind test passés aux chapitres (départ et durée), une fois
+    if ((s.sidetrack.blindDefaults ?? 1) < 2) {
+      state.blind.startMode = "chapter";
+      state.blind.clip = -1;
+      state.blindDefaults = 2;
+    }
   }
   if (!state.banned || typeof state.banned !== "object") state.banned = {};
   setLang(state.lang);
