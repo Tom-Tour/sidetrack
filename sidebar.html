@@ -85,6 +85,14 @@
     <section id="blind" hidden>
       <div id="blind-status"></div>
       <div id="blind-actions" class="controls"></div>
+      <!-- Hôte d'un salon : liste des pistes, clic = prochaine manche -->
+      <div id="host-tracks" hidden>
+        <div class="line">
+          <span id="host-tracks-title" class="muted"></span>
+          <button id="host-tracks-toggle"></button>
+        </div>
+        <ol id="host-queue"></ol>
+      </div>
       <fieldset id="blind-settings">
         <label><span data-i18n="clipLength"></span>
           <select id="clip">

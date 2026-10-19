@@ -404,12 +404,12 @@ const expanded = new Set();      // ids des vidéos dépliées
 const chaptersAsked = new Set(); // ids dont on a demandé les chapitres
 let dragging = false;
 
-function renderQueue(index) {
-  if (dragging) return; // reconstruire la liste annulerait le glisser-déposer en cours
-  $("#queue").replaceChildren(
-    ...items().map((item, i) => {
-      const li = el("li", null, i === index ? "current" : "");
-      li.draggable = true;
+// Une liste de pistes. Mode Playlist : glisser-déposer, suppression, clic = lecture.
+// Blind test de l'hôte : clic = prochaine manche, pistes déjà jouées grisées, rien d'éditable.
+function trackList(index, { picking = false, played = new Set() } = {}) {
+  return items().map((item, i) => {
+      const li = el("li", null, i === index ? "current" : played.has(`${i}`) ? "played" : "");
+      li.draggable = !picking;
       li.addEventListener("dragstart", (e) => {
         dragging = true;
         e.dataTransfer.setData("text/plain", String(i));
@@ -442,14 +442,16 @@ function renderQueue(index) {
       ).title = t("chapters");
       const title = row.appendChild(el("span", item.title));
       title.title = item.title;
-      row.addEventListener("click", () => act("play", i));
-      const del = row.appendChild(
-        button("✕", (e) => {
-          e.stopPropagation();
-          act("removeItem", i);
-        }, "del")
-      );
-      del.title = t("removeItem");
+      row.addEventListener("click", () => act(picking ? "blindPick" : "play", i, null));
+      if (!picking) {
+        const del = row.appendChild(
+          button("✕", (e) => {
+            e.stopPropagation();
+            act("removeItem", i);
+          }, "del")
+        );
+        del.title = t("removeItem");
+      }
 
       if (open) {
         const list = li.appendChild(el("ul", null, "chapters"));
@@ -462,18 +464,38 @@ function renderQueue(index) {
         } else if (!item.chapters.length) {
           list.appendChild(el("li", t("noChapters"), "muted"));
         } else {
-          for (const c of item.chapters) {
-            const crow = list.appendChild(el("li")).appendChild(el("div", null, "row"));
+          item.chapters.forEach((c, k) => {
+            const cli = list.appendChild(el("li", null, played.has(`${i}:${k}`) ? "played" : ""));
+            const crow = cli.appendChild(el("div", null, "row"));
             crow.append(el("time", formatTime(c.start)), el("span", c.title));
             crow.title = c.title;
-            crow.addEventListener("click", () => act("playAt", i, c.start));
-          }
+            crow.addEventListener("click", () => (picking ? act("blindPick", i, k) : act("playAt", i, c.start)));
+          });
         }
       }
       return li;
-    })
-  );
+    });
+}
+
+function renderQueue(index) {
+  if (dragging) return; // reconstruire la liste annulerait le glisser-déposer en cours
+  $("#queue").replaceChildren(...trackList(index));
   $("#empty").hidden = items().length > 0;
+}
+
+// Blind test avec un salon : l'hôte arbitre, il voit les pistes et choisit la prochaine manche
+let hostTracksShown = true;
+$("#host-tracks-toggle").addEventListener("click", () => {
+  hostTracksShown = !hostTracksShown;
+  render();
+});
+
+function renderHostTracks(game) {
+  const played = new Set(game.order.slice(0, game.pos + 1).map(({ i, chapter }) => (chapter == null ? `${i}` : `${i}:${chapter}`)));
+  $("#host-tracks-title").textContent = t("tracksTitle", items().length);
+  $("#host-tracks-toggle").textContent = hostTracksShown ? t("hide") : t("show");
+  $("#host-queue").hidden = !hostTracksShown;
+  if (hostTracksShown) $("#host-queue").replaceChildren(...trackList(view.state.index, { picking: true, played }));
 }
 
 function render() {
@@ -548,6 +570,8 @@ function render() {
   );
   $("#log").textContent = view.log.join("\n");
 
+  $("#host-tracks").hidden = !(blind && multi);
+  if (blind && multi) renderHostTracks(game);
   if (blind) renderBlind(game, items().length, multi);
   else renderQueue(state.index);
 }

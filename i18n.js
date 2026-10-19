@@ -94,6 +94,10 @@ const STRINGS = {
     sourceCode: "Code source sur GitHub",
     support: "Soutenir sur Ko-fi",
 
+    tracksTitle: "Pistes ({0}) : clique pour lancer la manche",
+    hide: "Masquer",
+    show: "Afficher",
+
     // Moteur
     defaultPlaylist: "Ma playlist",
     unavailable: "(indisponible) {0}",
@@ -260,6 +264,10 @@ const STRINGS = {
     about: "About",
     sourceCode: "Source code on GitHub",
     support: "Support on Ko-fi",
+
+    tracksTitle: "Tracks ({0}): click to start the round",
+    hide: "Hide",
+    show: "Show",
 
     defaultPlaylist: "My playlist",
     unavailable: "(unavailable) {0}",

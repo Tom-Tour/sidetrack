@@ -517,6 +517,24 @@ async function startGame() {
   nextRound();
 }
 
+// L'hôte choisit la prochaine manche (une piste, ou un chapitre) : elle part tout de suite.
+// Sans partie en cours, on en commence une faite des manches choisies à la main.
+async function blindPick(i, chapter = null) {
+  const item = items()[i];
+  if (!item || state.mode !== "blind" || game.phase === "loading") return;
+  if (chapter != null) {
+    await ensureChapters([item]);
+    if (!item.chapters?.[chapter]) return;
+  }
+  if (game.phase === "idle" || game.phase === "over") resetGame();
+  const same = (r) => r.i === i && (r.chapter ?? null) === chapter;
+  // Si cette manche était prévue plus loin, on la retire pour ne pas la rejouer
+  const later = game.order.findIndex((r, k) => k > game.pos && same(r));
+  if (later >= 0) game.order.splice(later, 1);
+  game.order.splice(game.pos + 1, 0, chapter == null ? { i } : { i, chapter });
+  nextRound();
+}
+
 function nextRound() {
   clearInterval(gameTimer);
   game.pos++;
@@ -643,6 +661,7 @@ const actions = {
   setMode,
   startGame,
   nextRound,
+  blindPick,
   reveal,
   answer,
   setBlind: (key, value) => {
