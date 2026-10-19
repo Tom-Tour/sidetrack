@@ -22,6 +22,8 @@ button:hover { border-color: var(--accent); }
 button.on { background: var(--active); border-color: var(--accent); }
 button.danger { color: var(--bad); border-color: var(--bad); }
 .muted { color: var(--muted); }
+#notice { margin: 6px 0 0; padding: 6px 8px; border: 1px solid var(--accent); border-radius: 4px; background: var(--active); }
+#notice button { margin-top: 4px; padding: 0 6px; }
 
 #pl-bar, #add { display: flex; gap: 4px; }
 #add { margin-top: 6px; }

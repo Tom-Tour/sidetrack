@@ -118,6 +118,39 @@ $("#pl-delete").addEventListener("click", (e) => {
   }, 3000);
 });
 
+// --- Export vers YouTube ---------------------------------------------------
+// watch_videos crée une playlist temporaire sans connexion ni clé d'API,
+// que l'utilisateur enregistre ensuite dans son compte. 50 vidéos maximum par lien.
+
+const EXPORT_CHUNK = 50;
+
+function notice(text) {
+  const el = $("#notice");
+  el.textContent = text;
+  const close = el.appendChild(document.createElement("div")).appendChild(document.createElement("button"));
+  close.textContent = "OK";
+  close.addEventListener("click", () => (el.hidden = true));
+  el.hidden = false;
+}
+
+$("#pl-export").addEventListener("click", async () => {
+  const ids = items().map((item) => item.id);
+  if (!ids.length) return notice("Playlist vide : rien à exporter.");
+  const parts = Math.ceil(ids.length / EXPORT_CHUNK);
+  for (let i = 0; i < parts; i++) {
+    const chunk = ids.slice(i * EXPORT_CHUNK, (i + 1) * EXPORT_CHUNK);
+    await browser.tabs.create({
+      url: "https://www.youtube.com/watch_videos?video_ids=" + chunk.join(","),
+      active: i === 0,
+    });
+  }
+  notice(
+    (parts > 1 ? `Playlist ouverte sur YouTube en ${parts} parties (50 vidéos max par partie). ` : "Playlist ouverte sur YouTube. ") +
+      "Pour la garder : dans le panneau de la playlist, ouvre le menu ⋮ puis « Tout ajouter à… » et choisis ou crée une playlist de ton compte."
+  );
+  log(`Export : ${ids.length} vidéos, ${parts} onglet(s)`);
+});
+
 // --- Analyse des liens ---------------------------------------------------
 
 function parseLink(text) {
