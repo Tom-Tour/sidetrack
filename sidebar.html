@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <form id="add">
+    <input id="url" type="text" placeholder="Lien YouTube (vidéo ou playlist)" autocomplete="off">
+    <button type="submit">Ajouter</button>
+  </form>
+
+  <div id="player-wrap"><iframe id="player" allow="autoplay; encrypted-media; fullscreen"></iframe></div>
+  <div id="now">Rien en lecture</div>
+
+  <div id="controls">
+    <button id="prev" title="Précédent">⏮</button>
+    <button id="toggle" title="Lecture / pause">⏯</button>
+    <button id="next" title="Suivant">⏭</button>
+    <button id="shuffle" title="Aléatoire">🔀</button>
+    <button id="clear" title="Vider la file">🗑</button>
+  </div>
+
+  <ol id="queue"></ol>
+
+  <details open>
+    <summary>Journal</summary>
+    <pre id="log"></pre>
+  </details>
+
+  <script src="sidebar.js"></script>
+</body>
+</html>

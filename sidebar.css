@@ -1,0 +1,34 @@
+:root {
+  --bg: #f9f9fb; --fg: #15141a; --muted: #5b5b66; --card: #fff;
+  --border: #d7d7db; --accent: #0061e0; --active: #e0ecff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1b22; --fg: #fbfbfe; --muted: #a3a3ad; --card: #2b2a33;
+    --border: #45444c; --accent: #00ddff; --active: #1f3a4d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 8px; background: var(--bg); color: var(--fg); font: 13px system-ui, sans-serif; }
+button, input[type=text] {
+  font: inherit; color: var(--fg); background: var(--card);
+  border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.on { background: var(--active); border-color: var(--accent); }
+#add { display: flex; gap: 4px; }
+#url { flex: 1; min-width: 0; }
+#player-wrap { margin-top: 8px; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
+#player { width: 100%; height: 100%; border: 0; }
+#now { margin: 6px 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#controls { display: flex; gap: 4px; }
+#controls button { flex: 1; }
+details { margin-top: 8px; }
+details label { display: block; margin: 4px 0; }
+summary { cursor: pointer; color: var(--muted); }
+#queue { margin: 8px 0 0; padding-left: 24px; }
+#queue li { padding: 3px 4px; border-radius: 3px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#queue li:hover { background: var(--card); }
+#queue li.current { background: var(--active); font-weight: 600; }
+#log { max-height: 160px; overflow: auto; font-size: 11px; color: var(--muted); white-space: pre-wrap; margin: 4px 0 0; }
