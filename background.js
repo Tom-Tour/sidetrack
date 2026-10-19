@@ -18,12 +18,14 @@ let state = {
   shuffle: false,
   mode: "listen",      // "listen" | "blind"
   blind: { clip: 20, randomStart: true, hideVideo: true },
+  volume: 100,
 };
 
 let playerState = -1;  // -1 non démarré, 0 fini, 1 lecture, 2 pause, 5 prête
 let importTarget = null;
 let notice = null;
 let logLines = [];
+let lastTick = null;   // position de lecture, pour la copie muette de la barre latérale
 
 // Partie de blind test en cours (non sauvegardée)
 let game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0 };
@@ -65,6 +67,7 @@ browser.runtime.onConnect.addListener((port) => {
   port.onDisconnect.addListener(() => ports.delete(port));
   port.onMessage.addListener(({ cmd, args = [] }) => actions[cmd]?.(...args));
   port.postMessage(snapshot());
+  port.postMessage({ tick: lastTick });
 });
 
 // --- Playlists -------------------------------------------------------------
@@ -201,7 +204,8 @@ let opening = null;
 
 function send(cmd) {
   if (playerPort) return playerPort.postMessage(cmd);
-  if (cmd.action === "pause") return;
+  // Sans onglet, seul un chargement justifie d'en ouvrir un
+  if (cmd.action !== "load" && cmd.action !== "playlist") return;
   queued.push(cmd);
   openPlayerTab();
 }
@@ -223,9 +227,14 @@ async function openPlayerTab() {
 
 // Revient à l'onglet où l'on naviguait avant l'ouverture du lecteur
 // (l'onglet du lecteur se masque alors via onActivated)
-function backToBrowsing() {
-  if (returnTabId != null) browser.tabs.update(returnTabId, { active: true }).catch(() => {});
+async function backToBrowsing() {
+  let target = returnTabId;
   returnTabId = null;
+  if (target == null) {
+    const tabs = await browser.tabs.query({ currentWindow: true, hidden: false });
+    target = tabs.find((t) => t.id !== playerTabId)?.id;
+  }
+  if (target != null) browser.tabs.update(target, { active: true }).catch(() => {});
 }
 
 // L'onglet du lecteur n'est visible que tant qu'on est dessus
@@ -253,6 +262,8 @@ function connectPlayer(port) {
     if (playerPort !== port) return;
     playerPort = null;
     playerState = -1;
+    lastTick = null;
+    for (const p of ports) p.postMessage({ tick: null });
     log("Onglet du lecteur fermé");
     update();
   });
@@ -260,10 +271,15 @@ function connectPlayer(port) {
   queued = [];
 }
 
-async function focusPlayer() {
+// Affiche l'onglet du lecteur ; s'il est déjà affiché et que toggle est vrai, revient à la navigation
+async function focusPlayer(toggle = false) {
   if (playerTabId == null || !playerPort) return;
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (active?.id === playerTabId) return;
+  if (active?.id === playerTabId) {
+    if (toggle) backToBrowsing();
+    return;
+  }
+  returnTabId = active?.id ?? null;
   await browser.tabs.show(playerTabId);
   browser.tabs.update(playerTabId, { active: true });
 }
@@ -272,7 +288,7 @@ function play(i, opts = {}) {
   if (i < 0 || i >= items().length) return;
   state.index = i;
   log(`Lecture : ${items()[i].title}`);
-  send({ action: "load", id: items()[i].id, ...opts });
+  send({ action: "load", id: items()[i].id, volume: state.volume, ...opts });
   update();
   save();
 }
@@ -281,6 +297,13 @@ function onPlayerMessage(msg) {
   switch (msg.type) {
     case "ready":
       log("✓ Lecteur prêt");
+      break;
+    case "tick":
+      lastTick = msg;
+      for (const p of ports) p.postMessage({ tick: msg });
+      break;
+    case "log":
+      log(msg.text);
       break;
     case "hello":
       log(`Lecture automatique : ${msg.autoplay}`);
@@ -364,7 +387,9 @@ function prev() {
 }
 
 function toggle() {
-  if (state.index < 0 && items().length) return play(0);
+  if (!items().length) return;
+  // Pas encore de morceau, ou onglet du lecteur fermé : on (re)lance le morceau
+  if (state.index < 0 || !playerPort) return play(Math.max(0, state.index));
   send({ action: playerState === 1 ? "pause" : "play" });
 }
 
@@ -478,7 +503,14 @@ const actions = {
     save();
   },
   exportPlaylist,
-  focusPlayer,
+  focusPlayer: () => focusPlayer(false),
+  togglePlayerTab: () => focusPlayer(true),
+  setVolume: (value) => {
+    state.volume = value;
+    send({ action: "volume", value });
+    update();
+    save();
+  },
   dismissNotice: () => {
     notice = null;
     update();

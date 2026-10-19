@@ -10,10 +10,33 @@ function act(cmd, ...args) {
   port.postMessage({ cmd, args });
 }
 
-port.onMessage.addListener((snap) => {
-  view = snap;
+port.onMessage.addListener((msg) => {
+  if ("tick" in msg) return syncMirror(msg.tick);
+  view = msg;
   render();
 });
+
+// --- Copie muette de la vidéo ----------------------------------------------
+// Même page que l'onglet du lecteur, en mode ?mirror=1 : toujours muette (donc
+// autorisée par Firefox sans clic), elle suit la position envoyée par l'onglet.
+
+const MIRROR_URL = "https://tom-tour.github.io/sidetrack/player/index.html";
+const mirror = $("#mirror");
+let mirrorReady = false;
+
+window.addEventListener("message", (e) => {
+  if (e.source === mirror.contentWindow && e.data?.sidetrack && e.data.type === "ready") mirrorReady = true;
+});
+
+function syncMirror(tick) {
+  if (!mirrorReady || !tick?.id) return;
+  mirror.contentWindow.postMessage(
+    { sidetrack: true, action: "sync", id: tick.id, time: tick.time, playing: tick.state === 1 },
+    new URL(MIRROR_URL).origin
+  );
+}
+
+mirror.src = `${MIRROR_URL}?mirror=1&t=${Date.now()}`;
 
 function items() {
   const { playlists, current } = view.state;
@@ -87,7 +110,8 @@ $("#prev").addEventListener("click", () => act("prev"));
 $("#next").addEventListener("click", () => act("next"));
 $("#toggle").addEventListener("click", () => act("toggle"));
 $("#shuffle").addEventListener("click", () => act("toggleShuffle"));
-$("#show-player").addEventListener("click", () => act("focusPlayer"));
+$("#show-player").addEventListener("click", () => act("togglePlayerTab"));
+$("#volume").addEventListener("input", (e) => act("setVolume", Number(e.target.value)));
 $("#mode-listen").addEventListener("click", () => act("setMode", "listen"));
 $("#mode-blind").addEventListener("click", () => act("setMode", "blind"));
 
@@ -196,15 +220,8 @@ function render() {
   $("#listen").hidden = blind;
   $("#blind").hidden = !blind;
 
-  // Miniature du morceau, cachée pendant une manche de blind test
+  // Vidéo cachée pendant une manche de blind test
   const current = items()[state.index];
-  const art = $("#art");
-  const showArt = current && !(secret && state.blind.hideVideo);
-  art.hidden = !showArt;
-  if (showArt) {
-    const src = `https://i.ytimg.com/vi/${current.id}/mqdefault.jpg`;
-    if (art.src !== src) art.src = src;
-  }
   $("#mask").hidden = !(secret && state.blind.hideVideo);
   $("#mask-time").textContent =
     game.phase === "timeup" ? "Temps écoulé" : state.blind.clip ? formatTime(game.remaining) : "";
@@ -212,6 +229,7 @@ function render() {
 
   $("#toggle").textContent = view.playerState === 1 ? "⏸" : "▶";
   $("#shuffle").classList.toggle("on", state.shuffle);
+  if (document.activeElement !== $("#volume")) $("#volume").value = String(state.volume ?? 100);
 
   if (document.activeElement !== $("#clip")) $("#clip").value = String(state.blind.clip);
   $("#randomStart").checked = state.blind.randomStart;

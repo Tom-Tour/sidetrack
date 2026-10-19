@@ -26,13 +26,15 @@
   </div>
 
   <div id="player-wrap">
-    <img id="art" alt="" hidden>
+    <!-- Copie muette de la vidéo : le son vient de l'onglet masqué du lecteur -->
+    <iframe id="mirror" allow="autoplay; encrypted-media"></iframe>
     <div id="mask" hidden>
       <div id="mask-icon">?</div>
       <div id="mask-time"></div>
     </div>
   </div>
   <div id="now">Rien en lecture</div>
+  <label id="volume-row" title="Volume">🔊 <input type="range" id="volume" min="0" max="100"></label>
 
   <section id="listen">
     <div class="controls">
@@ -40,7 +42,7 @@
       <button id="toggle" title="Lecture / pause">⏯</button>
       <button id="next" title="Suivant">⏭</button>
       <button id="shuffle" title="Aléatoire">🔀</button>
-      <button id="show-player" title="Afficher la vidéo">📺</button>
+      <button id="show-player" title="Afficher / masquer l'onglet du lecteur">📺</button>
     </div>
     <ol id="queue"></ol>
     <p id="empty" class="muted" hidden>Playlist vide : colle un lien YouTube ci-dessus.</p>
@@ -60,7 +62,7 @@
         </select>
       </label>
       <label><input type="checkbox" id="randomStart"> Départ à un moment aléatoire</label>
-      <label><input type="checkbox" id="hideVideo"> Masquer la miniature</label>
+      <label><input type="checkbox" id="hideVideo"> Masquer la vidéo</label>
     </fieldset>
   </section>
 
