@@ -8,11 +8,11 @@ const $ = (s) => document.querySelector(s);
 const STRINGS = {
   fr: {
     intro: "Rejoins le salon pour écouter ou jouer au blind test ensemble.",
-    codeLabel: "Code du salon",
+    codeLabel: "Nom du salon",
     nameLabel: "Ton pseudo",
     joinButton: "Rejoindre",
     connecting: "Connexion…",
-    notFound: "Salon introuvable : vérifie le code, ou l'hôte a fermé le salon.",
+    notFound: "Salon introuvable : vérifie le nom, ou l'hôte a fermé le salon.",
     cantConnect: "Connexion impossible ({0}).",
     room: "Salon",
     volume: "Volume",
@@ -48,11 +48,11 @@ const STRINGS = {
   },
   en: {
     intro: "Join the room to listen or play blind test together.",
-    codeLabel: "Room code",
+    codeLabel: "Room name",
     nameLabel: "Your nickname",
     joinButton: "Join",
     connecting: "Connecting…",
-    notFound: "Room not found: check the code, or the host closed the room.",
+    notFound: "Room not found: check the name, or the host closed the room.",
     cantConnect: "Can't connect ({0}).",
     room: "Room",
     volume: "Volume",
@@ -138,7 +138,19 @@ const expanded = new Set();
 
 // --- Connexion ---------------------------------------------------------------
 
-$("#code").value = location.hash.slice(1).toUpperCase();
+// Nom de salon = identifiant : même règle que l'extension (minuscules, sans accents, espaces → tirets)
+function roomName(text) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24);
+}
+
+$("#code").value = decodeURIComponent(location.hash.slice(1));
 try {
   $("#name").value = localStorage.getItem("sidetrack-name") ?? "";
 } catch {}
@@ -146,7 +158,7 @@ if ($("#code").value) $("#name").focus();
 
 $("#login-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const code = $("#code").value.trim().toUpperCase();
+  const code = roomName($("#code").value);
   const name = $("#name").value.trim();
   if (!code || !name) return;
   try {

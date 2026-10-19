@@ -65,22 +65,22 @@ button.danger { color: var(--bad); border-color: var(--bad); }
 .chapters .row { gap: 6px; }
 .chapters time { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-#multi { margin-bottom: 8px; }
-#multi-bar { display: flex; gap: 4px; }
-#multi-bar button { flex: 1; }
-.sub { display: grid; gap: 4px; margin-top: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 4px; }
+/* Boutons-icônes : même largeur partout, donc alignés d'une ligne à l'autre */
+.icon { flex: none; width: 30px; padding: 4px 0; text-align: center; }
 .line { display: flex; align-items: center; gap: 4px; }
-.sub.line { display: flex; }
-#join-code { flex: 1; min-width: 0; }
-#join-code { text-transform: uppercase; letter-spacing: 1px; }
-#join-panel .line #public-status { flex: 1; }
-#public-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
-#public-list li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; }
+.line input[type=text] { flex: 1; min-width: 0; }
+.line label { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+#online h3 { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+#public-head { margin-top: 10px; }
+#public-head h3 { margin: 0; }
+#public-status { flex: 1; text-align: right; }
+#public-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; }
+#public-list li { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--border); }
 #public-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#room-panel { border: 1px solid var(--border); border-radius: 4px; padding: 6px; }
+#room-panel { margin-top: 8px; }
 #room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #room-head strong { font-size: 15px; letter-spacing: 1px; }
-#room-close { margin-left: auto; }
+#room-head > span:first-child { flex: 1; }
 #room-players { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 #room-players li { display: flex; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 10px; }
 #room-players li b { font-variant-numeric: tabular-nums; }

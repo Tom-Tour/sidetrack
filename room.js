@@ -11,7 +11,7 @@
 
 const JOIN_URL = "https://tom-tour.github.io/sidetrack/join/";
 const ROOM_PREFIX = "sidetrack-room-";
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_CHARS = "abcdefghjkmnpqrstuvwxyz23456789";
 const CHAT_LIMIT = 200;
 
 // { code, link, status, public, peer, players: Map(peerId → { id, name, score, conn }), chat: [] }
@@ -24,7 +24,20 @@ function makeCode() {
   return Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 }
 
-function openRoom({ isPublic = false } = {}) {
+// Nom de salon = identifiant pour le rejoindre : minuscules, sans accents, espaces → tirets
+function roomName(text) {
+  return String(text ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24);
+}
+const ROOM_NAME = /^[a-z0-9_-]{3,24}$/;
+
+function openRoom({ isPublic = false, name = "" } = {}) {
   if (room) return;
   log(
     t(
@@ -33,7 +46,12 @@ function openRoom({ isPublic = false } = {}) {
       typeof RTCPeerConnection === "function" ? t("available") : t("missing")
     )
   );
-  const code = makeCode();
+  const chosen = roomName(name);
+  if (chosen && !ROOM_NAME.test(chosen)) {
+    notice = { key: "noticeNameShort" };
+    return update();
+  }
+  const code = chosen || makeCode();
   const peer = new Peer(ROOM_PREFIX + code);
   room = {
     code,
@@ -59,11 +77,11 @@ function openRoom({ isPublic = false } = {}) {
   peer.on("error", (e) => {
     if (room?.peer !== peer) return;
     if (e.type === "unavailable-id") {
-      // Code déjà pris : on en tire un autre
-      const { public: isPublic } = room;
+      // Nom déjà utilisé par un autre salon ouvert
       peer.destroy();
       room = null;
-      return openRoom({ isPublic });
+      notice = { key: "noticeNameTaken", args: [code] };
+      return update();
     }
     log(t("logRoomError", e.type));
     if (["network", "server-error", "socket-error", "browser-incompatible"].includes(e.type)) {
@@ -77,8 +95,8 @@ function openRoom({ isPublic = false } = {}) {
 // Rejoindre le salon de quelqu'un : la page invité s'ouvre dans un onglet visible
 // (il faut voir la vidéo et cliquer dans la page pour avoir le son)
 function joinRoom(code) {
-  code = String(code).toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (code.length !== 5) return log(t("logBadCode"));
+  code = roomName(code);
+  if (!ROOM_NAME.test(code)) return log(t("logBadCode"));
   send({ action: "pause" }); // notre propre musique laisse la place au salon
   browser.tabs.create({ url: `${JOIN_URL}#${code}` });
 }
@@ -358,7 +376,7 @@ async function refreshPublicRooms() {
       } catch {
         continue;
       }
-      if (c.closed || typeof c.code !== "string" || !/^[A-Z0-9]{5}$/.test(c.code)) continue;
+      if (c.closed || typeof c.code !== "string" || !ROOM_NAME.test(c.code)) continue;
       if (c.code === room?.code) continue; // notre propre salon
       list.push({
         code: c.code,

@@ -101,40 +101,56 @@ $("#close-settings").addEventListener("click", () => showSettings(false));
 $("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
 $("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
 
-// --- Multijoueur -------------------------------------------------------------
+// --- Onglets -----------------------------------------------------------------
+// Playlist et Blind test changent le mode du moteur ; Salon n'est qu'une vue.
 
-// Un seul panneau ouvert à la fois : créer, ou rejoindre (code et salons publics)
-let multiPanel = null;
-const PANELS = { create: "#create-form", join: "#join-panel" };
+let tab = null; // null : suit le mode du moteur ; "online" : onglet Salon
 
-function openPanel(name) {
-  multiPanel = multiPanel === name ? null : name;
-  for (const [key, sel] of Object.entries(PANELS)) {
-    $(sel).hidden = key !== multiPanel;
-    $(`#multi-${key}`).classList.toggle("on", key === multiPanel);
-  }
-  if (multiPanel === "join") {
-    $("#join-code").focus();
-    act("refreshPublicRooms");
-  }
+$("#mode-listen").addEventListener("click", () => {
+  tab = null;
+  act("setMode", "listen");
+});
+$("#mode-blind").addEventListener("click", () => {
+  tab = null;
+  act("setMode", "blind");
+});
+$("#mode-online").addEventListener("click", () => {
+  tab = "online";
+  act("refreshPublicRooms");
+  render();
+});
+
+// --- Salon -------------------------------------------------------------------
+
+// Même règle que room.js : minuscules, sans accents, espaces → tirets
+function roomName(text) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24);
 }
 
-for (const name of Object.keys(PANELS)) {
-  $(`#multi-${name}`).addEventListener("click", () => openPanel(name));
+function suggestName() {
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
+$("#room-name").value = suggestName();
 
 $("#create-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  act("openRoom", { isPublic: $("#room-public").checked });
-  openPanel(null);
+  const name = roomName($("#room-name").value) || suggestName();
+  act("openRoom", { name, isPublic: $("#room-public").checked });
 });
 $("#join-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const code = $("#join-code").value.trim().toUpperCase();
-  if (!code) return;
-  act("joinRoom", code);
+  const name = roomName($("#join-code").value);
+  if (!name) return;
+  act("joinRoom", name);
   $("#join-code").value = "";
-  openPanel(null);
 });
 $("#public-refresh").addEventListener("click", () => act("refreshPublicRooms"));
 
@@ -240,17 +256,19 @@ function renderPublicRooms() {
   );
 }
 
-function renderRoom(blind) {
+function renderRoom(blind, shown) {
   const room = view.room;
-  $("#multi").hidden = !view.state.showMulti && !room;
-  $("#multi-bar").hidden = !!room;
+  // Le panneau du salon suit l'onglet affiché : l'arbitre garde le chat sous les commandes du jeu
+  const slot = $(`#room-slot-${shown}`);
+  if ($("#room-panel").parentElement !== slot) slot.appendChild($("#room-panel"));
   $("#room-panel").hidden = !room;
-  if (room) {
-    for (const sel of Object.values(PANELS)) $(sel).hidden = true;
-  } else {
-    for (const [key, sel] of Object.entries(PANELS)) $(sel).hidden = key !== multiPanel;
+  $("#online-start").hidden = !!room;
+  if (!room) {
+    // Nouveau nom proposé après la fermeture d'un salon
+    if (!$("#room-name").value && document.activeElement !== $("#room-name")) $("#room-name").value = suggestName();
     return renderPublicRooms();
   }
+  if (room.code === roomName($("#room-name").value)) $("#room-name").value = "";
 
   $("#room-code").textContent = room.code;
   $("#room-public-badge").hidden = !room.public;
@@ -434,11 +452,17 @@ function render() {
   const blind = state.mode === "blind";
   // Dans un salon, l'hôte est l'arbitre : il voit tout, même pendant une manche
   const secret = blind && !multi && ["playing", "timeup"].includes(game.phase);
-  $("#mode-listen").classList.toggle("on", !blind);
-  $("#mode-blind").classList.toggle("on", blind);
-  $("#listen").hidden = blind;
-  $("#blind").hidden = !blind;
-  renderRoom(blind);
+  // Onglet Salon : visible si activé dans les réglages (ou si un salon est ouvert)
+  const onlineAllowed = state.showMulti || multi;
+  if (tab === "online" && !onlineAllowed) tab = null;
+  const shown = tab ?? (blind ? "blind" : "listen"); // onglet affiché
+  $("#mode-online").hidden = !onlineAllowed;
+  for (const name of ["listen", "blind", "online"]) {
+    $(`#mode-${name}`).classList.toggle("on", shown === name);
+    $(`#${name}`).hidden = shown !== name;
+  }
+  $("#stage").hidden = shown === "online";
+  renderRoom(blind, shown);
 
   // Miniature du morceau (la vidéo est dans l'onglet masqué). En blind test solo, aperçu noir
   // sauf une fois la réponse révélée (ou pendant la manche si on ne masque pas la vidéo).

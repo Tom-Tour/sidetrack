@@ -6,55 +6,14 @@
 </head>
 <body>
   <main id="main">
-    <!-- Multijoueur, en haut : chaque bouton déplie son panneau -->
-    <section id="multi">
-      <div id="multi-bar">
-        <button id="multi-create" data-i18n="createRoom"></button>
-        <button id="multi-join" data-i18n="joinRoom"></button>
-      </div>
-
-      <form id="create-form" class="sub" hidden>
-        <label><input type="checkbox" id="room-public"> <span data-i18n="publicRoom"></span></label>
-        <button type="submit" data-i18n="openRoom"></button>
-      </form>
-
-      <div id="join-panel" class="sub" hidden>
-        <form id="join-form" class="line">
-          <input id="join-code" type="text" data-i18n-placeholder="roomCode" maxlength="5" autocomplete="off">
-          <button type="submit" data-i18n="join"></button>
-        </form>
-        <div class="line">
-          <strong data-i18n="publicRooms"></strong>
-          <span id="public-status" class="muted"></span>
-          <button id="public-refresh" data-i18n-title="refresh">↻</button>
-        </div>
-        <ul id="public-list"></ul>
-      </div>
-
-      <div id="room-panel" hidden>
-        <div id="room-head">
-          <span><span data-i18n="room"></span> <strong id="room-code"></strong> <span id="room-public-badge" data-i18n-title="publicBadge">🌐</span></span>
-          <span id="room-status" class="muted"></span>
-          <button id="room-copy" data-i18n-title="copyLinkTitle"></button>
-          <button id="room-close" data-i18n-title="closeRoom">✕</button>
-        </div>
-        <ul id="room-players"></ul>
-        <div id="chat"></div>
-        <form id="chat-form">
-          <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
-          <button type="submit" data-i18n="sendChat"></button>
-        </form>
-      </div>
-    </section>
-
     <div id="pl-bar">
       <select id="pl-select" data-i18n-title="playlist"></select>
       <input id="pl-name" type="text" data-i18n-placeholder="playlistName" autocomplete="off" hidden>
-      <button id="pl-new" data-i18n-title="newPlaylist">＋</button>
-      <button id="pl-rename" data-i18n-title="rename">✎</button>
-      <button id="pl-delete" data-i18n-title="deletePlaylist">🗑</button>
-      <button id="pl-export" data-i18n-title="exportYoutube">⤴</button>
-      <button id="open-settings" data-i18n-title="settings">⚙</button>
+      <button id="pl-new" class="icon" data-i18n-title="newPlaylist">＋</button>
+      <button id="pl-rename" class="icon" data-i18n-title="rename">✎</button>
+      <button id="pl-delete" class="icon" data-i18n-title="deletePlaylist">🗑</button>
+      <button id="pl-export" class="icon" data-i18n-title="exportYoutube">⤴</button>
+      <button id="open-settings" class="icon" data-i18n-title="settings">⚙</button>
     </div>
     <p id="notice" hidden></p>
 
@@ -66,8 +25,10 @@
     <div id="tabs">
       <button id="mode-listen" class="tab" data-i18n="modePlaylist"></button>
       <button id="mode-blind" class="tab" data-i18n="modeBlind"></button>
+      <button id="mode-online" class="tab" data-i18n="modeOnline"></button>
     </div>
 
+    <div id="stage">
     <div id="player-wrap">
       <img id="art" alt="" hidden>
       <div id="mask" hidden>
@@ -78,7 +39,8 @@
     <div id="now"></div>
     <div id="volume-row">
       <label data-i18n-title="volume">🔊 <input type="range" id="volume" min="0" max="100"></label>
-      <button id="show-player" data-i18n-title="togglePlayer">📺</button>
+      <button id="show-player" class="icon" data-i18n-title="togglePlayer">📺</button>
+    </div>
     </div>
 
     <section id="listen">
@@ -88,6 +50,7 @@
         <button id="next" data-i18n-title="next">⏭</button>
         <button id="shuffle" data-i18n-title="shuffle">🔀</button>
       </div>
+      <div id="room-slot-listen"></div>
       <ol id="queue"></ol>
       <p id="empty" class="muted" data-i18n="emptyPlaylist" hidden></p>
     </section>
@@ -95,6 +58,7 @@
     <section id="blind" hidden>
       <div id="blind-status"></div>
       <div id="blind-actions" class="controls"></div>
+      <div id="room-slot-blind"></div>
       <fieldset id="blind-settings">
         <label><span data-i18n="clipLength"></span>
           <select id="clip">
@@ -116,7 +80,48 @@
         <label><input type="checkbox" id="hideVideo"> <span data-i18n="hideVideo"></span></label>
       </fieldset>
     </section>
+
+    <!-- Onglet Salon : créer, rejoindre, salons publics ; puis le salon lui-même -->
+    <section id="online" hidden>
+      <div id="online-start">
+        <h3 data-i18n="createRoom"></h3>
+        <form id="create-form" class="line">
+          <input id="room-name" type="text" data-i18n-placeholder="roomName" maxlength="24" autocomplete="off">
+          <label data-i18n-title="publicRoom"><input type="checkbox" id="room-public"> <span data-i18n="public"></span></label>
+          <button type="submit" data-i18n="create"></button>
+        </form>
+        <h3 data-i18n="joinRoom"></h3>
+        <form id="join-form" class="line">
+          <input id="join-code" type="text" data-i18n-placeholder="joinName" maxlength="24" autocomplete="off">
+          <button type="submit" data-i18n="join"></button>
+        </form>
+        <div class="line" id="public-head">
+          <h3 data-i18n="publicRooms"></h3>
+          <span id="public-status" class="muted"></span>
+          <button id="public-refresh" class="icon" data-i18n-title="refresh">↻</button>
+        </div>
+        <ul id="public-list"></ul>
+      </div>
+      <div id="room-slot-online"></div>
+    </section>
   </main>
+
+  <!-- Panneau du salon ouvert : déplacé par sidebar.js dans l'onglet affiché -->
+  <div id="room-panel" hidden>
+        <div id="room-head">
+          <span><span data-i18n="room"></span> <strong id="room-code"></strong> <span id="room-public-badge" data-i18n-title="publicBadge">🌐</span></span>
+          <span id="room-status" class="muted"></span>
+          <button id="room-copy" data-i18n-title="copyLinkTitle"></button>
+          <button id="room-close" class="icon" data-i18n-title="closeRoom">✕</button>
+        </div>
+        <ul id="room-players"></ul>
+        <div id="chat"></div>
+        <form id="chat-form">
+          <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
+          <button type="submit" data-i18n="sendChat"></button>
+        </form>
+      </div>
+
 
   <main id="settings" hidden>
     <div class="line">
