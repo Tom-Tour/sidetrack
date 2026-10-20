@@ -508,6 +508,9 @@ function renderRoom(blind) {
   hadRoom = !!room;
   $("#toggle-room").hidden = !view.settings.showMulti && !room;
   $("#toggle-room").classList.toggle("on", roomOpen);
+  // Tant que le salon en ligne n'est pas ouvert, 🌐 pulse doucement pour inviter à rejoindre
+  // des playlists en ligne
+  $("#toggle-room").classList.toggle("beckon", !roomOpen && !room);
 
   // Messages des autres : badge de non-lus sur 🌐 quand le chat est replié, son en option
   const me = guest ? guest.me : "host";

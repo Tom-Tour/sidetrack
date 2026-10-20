@@ -45,6 +45,17 @@ button.subtle-danger { color: var(--bad); }
 button.small { padding: 1px 6px; font-size: 12px; }
 /* Boutons-icônes : même largeur partout, donc alignés d'une ligne à l'autre */
 button.icon { flex: none; width: 30px; padding: 4px 0; text-align: center; }
+/* Bouton qui invite à essayer une fonction pas encore ouverte (le salon en ligne…) : un halo
+   léger qui pulse, jamais quand le bouton est actif ; fixe si le système demande moins
+   d'animations */
+@keyframes beckon {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); border-color: var(--accent); }
+}
+.beckon:not(.on) { animation: beckon 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .beckon:not(.on) { animation: none; border-color: var(--accent); }
+}
 
 /* --- Utilitaires --- */
 .muted { color: var(--muted); }
