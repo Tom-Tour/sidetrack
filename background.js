@@ -31,6 +31,7 @@ const DEFAULTS = {
   // hints : lettres du titre dévoilées peu à peu pendant la manche (le maximum de points baisse)
   blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto", judge: "chat", hints: true },
   banned: {},          // identité (clé publique) → « Nom · CODE » : refusés dans nos salons
+  blocked: {},         // pareil pour les personnes bloquées : cachées dans les salons des autres, refusées dans les nôtres
 };
 
 let settings = structuredClone(DEFAULTS);
@@ -85,9 +86,10 @@ function loadSettings(raw = {}) {
     const value = cleanBlind(key, raw.blind?.[key]);
     if (value !== undefined) out.blind[key] = value;
   }
-  if (raw.banned && typeof raw.banned === "object") {
-    for (const [id, label] of Object.entries(raw.banned)) {
-      if (/^[0-9a-f]{64}$/.test(id) && typeof label === "string") out.banned[id] = cleanText(label, 40);
+  for (const list of ["banned", "blocked"]) {
+    if (!raw[list] || typeof raw[list] !== "object") continue;
+    for (const [id, label] of Object.entries(raw[list])) {
+      if (/^[0-9a-f]{64}$/.test(id) && typeof label === "string") out[list][id] = cleanText(label, 40);
     }
   }
   return out;
@@ -1112,6 +1114,15 @@ const actions = {
   ban: (playerId) => kick(playerId, true),
   unban: (playerId) => {
     delete settings.banned[playerId];
+    room?.kicked.delete(playerId); // bannir excluait aussi du salon ouvert : il peut y revenir
+    update();
+    save();
+  },
+  // Bloquer : choix personnel, depuis la fiche d'une personne dans le salon de quelqu'un d'autre
+  block: (playerId) => guestBlock(playerId),
+  unblock: (playerId) => {
+    delete settings.blocked[playerId];
+    guestUnblock(playerId);
     update();
     save();
   },

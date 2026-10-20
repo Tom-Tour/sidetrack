@@ -374,11 +374,12 @@ function renderPublicRooms() {
   );
 }
 
-// --- Fiche d'un joueur (hôte) ------------------------------------------------
-// Clic sur un nom → fiche : points en blind test, « Exclure… », « Bannir… ». Exclure ou
-// bannir passe toujours par un panneau qui écrit les conséquences (GUIDE.md).
+// --- Fiche d'une personne ------------------------------------------------------
+// Clic sur un nom → fiche. Hôte : points en blind test, « Exclure… », « Bannir… ». Invité :
+// « Bloquer… » (une autre personne ou l'hôte). Toujours par un panneau qui écrit les
+// conséquences (GUIDE.md).
 
-let person = null; // { id, confirm: null | "kick" | "ban" }
+let person = null; // { id, confirm: null | "kick" | "ban" | "block" }
 
 function openPerson(id) {
   person = { id, confirm: null };
@@ -392,13 +393,14 @@ function closePerson() {
 
 function renderPerson(blind) {
   const box = $("#person");
-  const room = view.room;
+  const guest = view.guest;
+  const room = view.room ?? (guest?.status === "joined" ? guest : null);
   const known =
     person &&
     room &&
     (person.id === "host"
-      ? { id: "host", name: t("host"), code: view.me.code, score: room.hostScore }
-      : room.players.find((p) => p.id === person.id));
+      ? { id: "host", name: t("host"), code: guest ? guest.hostCode : view.me.code, score: room.hostScore }
+      : room.players.find((p) => p.id === person.id && p.id !== guest?.me));
   box.hidden = !known;
   if (!known) {
     person = null;
@@ -424,19 +426,21 @@ function renderPerson(blind) {
     box.replaceChildren(
       head,
       el("p", t(`${kind}ConfirmTitle`, known.name), "warn"),
-      el("p", t(`${kind}ConfirmHelp`), "muted"),
+      el("p", t(kind === "block" && known.id === "host" ? "blockHostConfirmHelp" : `${kind}ConfirmHelp`), "muted"),
       actions
     );
     return;
   }
   const actions = el("div", null, "actions");
-  if (blind) actions.append(button("+1", () => act("award", known.id, 1)), button("−1", () => act("award", known.id, -1)));
-  if (known.id !== "host") {
-    const ask = (kind) => () => {
-      person.confirm = kind;
-      render();
-    };
-    actions.append(button(t("kickAsk"), ask("kick")), button(t("banAsk"), ask("ban"), "subtle-danger"));
+  const ask = (kind) => () => {
+    person.confirm = kind;
+    render();
+  };
+  if (guest) {
+    actions.append(button("⛔ " + t("blockAsk"), ask("block"), "subtle-danger"));
+  } else {
+    if (blind) actions.append(button("+1", () => act("award", known.id, 1)), button("−1", () => act("award", known.id, -1)));
+    if (known.id !== "host") actions.append(button(t("kickAsk"), ask("kick")), button(t("banAsk"), ask("ban"), "subtle-danger"));
   }
   box.replaceChildren(head, actions);
 }
@@ -462,7 +466,10 @@ function chatLine(msg, { guest, referee, playing }) {
   }
   const p = el("p", null, msg.private ? "msg private" : "msg");
   if (msg.private) p.append("🔒 ");
-  const clickable = !guest && msg.from !== "host" && view.room?.players.some((x) => x.id === msg.from);
+  // Nom cliquable (fiche) : chez l'hôte, un invité présent ; chez un invité, l'hôte ou un autre invité
+  const clickable = guest
+    ? msg.from !== view.guest.me && (msg.from === "host" || view.guest.players.some((x) => x.id === msg.from))
+    : msg.from !== "host" && view.room?.players.some((x) => x.id === msg.from);
   const name = p.appendChild(el("span", `${who(msg)} : `, clickable ? "who" : "who me"));
   name.title = label(who(msg), msg.code);
   if (msg.color) name.style.color = msg.color;
@@ -557,20 +564,15 @@ function renderRoom(blind) {
   const hostChip = () =>
     chip(
       { name: t("host"), code: guest ? guest.hostCode : view.me.code },
-      { me: !guest, score: hostScore, onClick: guest ? null : () => openPerson("host") }
+      { me: !guest, score: hostScore, onClick: () => openPerson("host") }
     );
   $("#room-players").replaceChildren(
     ...(hostScore != null ? [hostChip()] : []),
     ...room.players.map((p) =>
-      chip(p, { me: p.id === me, score: scores ? p.score : null, onClick: guest ? null : () => openPerson(p.id) })
+      chip(p, { me: p.id === me, score: scores ? p.score : null, onClick: p.id === me ? null : () => openPerson(p.id) })
     )
   );
-  if (guest) {
-    person = null;
-    $("#person").hidden = true;
-  } else {
-    renderPerson(blind);
-  }
+  renderPerson(blind);
 
   const chat = $("#chat");
   const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
@@ -946,7 +948,18 @@ function renderSettings(settings) {
   if (document.activeElement !== $("#set-nickname")) $("#set-nickname").value = settings.nickname;
   $("#set-nickname").placeholder = t("defaultName");
   $("#my-code").textContent = view.me.code || "…";
-  // Personnes bannies, au format « Nom · CODE »
+  // Personnes bloquées puis bannies, au format « Nom · CODE »
+  const blocked = Object.entries(settings.blocked);
+  $("#blocked").replaceChildren(
+    ...(blocked.length
+      ? blocked.map(([id, name]) => {
+          const li = el("li");
+          li.appendChild(el("span", name)).title = id;
+          li.append(button(t("unblock"), () => act("unblock", id)));
+          return li;
+        })
+      : [el("li", t("noBlocked"), "muted")])
+  );
   const banned = Object.entries(settings.banned);
   $("#banned").replaceChildren(
     ...(banned.length

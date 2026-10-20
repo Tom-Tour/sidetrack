@@ -178,5 +178,66 @@ const { until, check, done, makeEngine, playlist, FakeWorker } = require("./harn
   } catch (err) {
     check("exception (fantômes)", false, err.stack);
   }
+  // --- Bloquer : choix personnel d'un invité ---
+  try {
+    const host = makeEngine("hôte 3", { sidetrack: playlist });
+    const eve = makeEngine("eve", { settings: { nickname: "Eve" } });
+    const finn = makeEngine("finn", { settings: { nickname: "Finn" } });
+    await until(() => host.snap()?.me.code && eve.snap()?.me.code && finn.snap()?.me.code, 10000);
+    host.act("openRoom", { name: "blocage" });
+    await until(() => host.snap()?.room?.status === "open");
+    eve.act("joinRoom", "blocage");
+    finn.act("joinRoom", "blocage");
+    await until(() => eve.snap()?.guest?.players.length === 2 && finn.snap()?.guest?.players.length === 2, 5000);
+    eve.act("guestChat", "Eve dit bonjour", false);
+    finn.act("guestChat", "Finn dit bonjour", false);
+    await until(() => eve.snap().guest.chat.some((x) => x.text === "Finn dit bonjour") && finn.snap().guest.chat.some((x) => x.text === "Eve dit bonjour"));
+    const finnId = finn.snap().guest.me;
+    const eveId = eve.snap().guest.me;
+
+    eve.act("block", finnId);
+    await until(() => eve.snap().settings.blocked[finnId]);
+    check("bloqué : retenu au format « Nom · CODE »", eve.snap().settings.blocked[finnId] === `Finn · ${finn.snap().me.code}`, eve.snap().settings.blocked[finnId]);
+    check("Finn disparaît des pastilles et du chat d'Eve", !eve.snap().guest.players.some((p) => p.id === finnId) && !eve.snap().guest.chat.some((x) => x.from === finnId));
+    await until(() => host.eval(`room.players.get("${eveId}").blocks.has("${finnId}")`));
+    check("l'hôte ne connaît que cette identité présente", host.eval(`room.players.get("${eveId}").blocks.size`) === 1);
+    await until(() => !finn.snap().guest.players.some((p) => p.id === eveId) && !finn.snap().guest.chat.some((x) => x.from === eveId), 3000);
+    check("et Eve disparaît aussi chez Finn", !finn.snap().guest.players.some((p) => p.id === eveId) && !finn.snap().guest.chat.some((x) => x.from === eveId));
+    await until(() => false, 1100);
+    finn.act("guestChat", "Finn encore", false);
+    eve.act("guestChat", "Eve encore", false);
+    await until(() => host.snap().room.chat.some((x) => x.text === "Finn encore") && host.snap().room.chat.some((x) => x.text === "Eve encore"));
+    await until(() => false, 300);
+    check("plus rien ne passe entre eux, même pas relayé", !eve.eval("guest.chat").some((x) => x.from === finnId) && !finn.eval("guest.chat").some((x) => x.from === eveId));
+    check("l'hôte voit toujours les deux", host.snap().room.players.length === 2);
+
+    eve.act("unblock", finnId);
+    await until(() => eve.snap().guest.players.some((p) => p.id === finnId), 3000);
+    check("débloqué : Finn revient chez Eve", !eve.snap().settings.blocked[finnId]);
+
+    // Bloquer l'hôte : on quitte son salon, et ses salons restent fermés
+    const hostId = host.eval("identity.pubkey");
+    eve.act("block", "host");
+    await until(() => eve.snap().guest?.status === "ended");
+    check("hôte bloqué : Eve quitte le salon", eve.snap().guest.endKey === "errHostBlocked" && eve.snap().settings.blocked[hostId] === `Hôte · ${host.snap().me.code}`);
+    eve.act("leaveRoom");
+    eve.act("joinRoom", "blocage");
+    await until(() => eve.snap().guest?.status === "ended", 5000);
+    check("et ne peut plus y revenir", eve.snap().guest.endKey === "errHostBlocked");
+    eve.act("leaveRoom");
+
+    // Une personne bloquée n'entre pas dans nos salons
+    host.act("closeRoom");
+    eve.act("openRoom", { name: "chez-eve" });
+    await until(() => eve.snap()?.room?.status === "open");
+    host.act("joinRoom", "chez-eve");
+    await until(() => host.snap().guest?.status === "ended", 5000);
+    check("bloqué : refusé dans les salons d'Eve", host.snap().guest.endKey === "errBanned" && !eve.snap().room.players.length);
+
+    const errs = [host, eve, finn].flatMap((e) => e.errors());
+    check("aucune erreur au journal (bloquer)", !errs.length, errs.join(" / "));
+  } catch (err) {
+    check("exception (bloquer)", false, err.stack);
+  }
   done();
 })();

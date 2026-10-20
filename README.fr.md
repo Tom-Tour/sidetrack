@@ -14,7 +14,8 @@ Une extension Firefox pour écouter des playlists YouTube locales dans la barre 
 - **Points** : réponses écrites notées sur 10 (tous les points pour une réponse reconnue comme juste, des points partiels dès 4 lettres consécutives en commun avec le titre, seule la meilleure réponse de chacun compte), ou chacun se juge (Trouvé / Raté)
 - **Salons** (🌐) : un seul champ pour créer ou rejoindre un salon par son nom, les salons publics juste en dessous. Les amis rejoignent avec un lien (rien à installer) ou depuis leur propre Sidetrack. Lecture synchronisée avec un chat ; les invités proposent des vidéos, des chapitres ou des moments, et un lien YouTube posté dans le chat s'ajoute à la playlist de l'hôte d'un clic
 - **Blind test en salon**, de deux façons : **❓ Blind test**, où l'hôte joue aussi et ne voit rien à l'avance, ou **🎤 Animateur**, où l'hôte voit tout (titres, vidéo, réponses) et donne les points à la main ou les laisse compter. Les réponses restent cachées jusqu'à la révélation, sauf si un joueur passe de 🔒 à 💬 pour discuter en clair
-- **Codes d'identité** : 4 caractères à côté de chaque nom (joueurs, chat, liste des bannis), liés à l'identité de chacun ; exclure ou bannir passe par une fiche qui écrit les conséquences
+- **Codes d'identité** : 4 caractères à côté de chaque nom (joueurs, chat, listes des bloqués et des bannis), liés à l'identité de chacun ; exclure, bannir ou bloquer passe par une fiche qui écrit les conséquences
+- **Bloquer** quelqu'un dans le salon d'un autre (clic sur son nom, puis Bloquer… et confirmer) : ses messages et sa pastille disparaissent chez toi, les tiens chez lui, dans tous les salons, et il ne peut plus entrer dans ceux que tu crées. Bloquer l'hôte fait quitter le salon et te ferme ses salons
 - **Playlists toutes prêtes** (📚) : musiques de jeux vidéo, bandes-son épiques de dark fantasy et d'espace, génériques d'animes (uniquement des vidéos officielles : artistes, compositeurs, labels, éditeurs, les écouter rémunère ceux qui les ont faites), et les mixes de musique de jeux vidéo de dedeco, un morceau par manche en mode chapitres
 - **Sauvegarde** des playlists dans un fichier, et restauration
 - Bouton dans la barre d'outils : il ouvre ou ferme la barre latérale, avec un badge pour les messages du salon arrivés pendant qu'elle était fermée
@@ -35,7 +36,7 @@ Sidetrack n'a ni serveur ni statistiques : rien n'est envoyé au développeur. C
 
 Les limites, honnêtement :
 - **Un salon privé n'est privé que par son nom** : qui connaît ou devine le nom peut essayer d'entrer. Choisis un nom difficile à deviner.
-- **L'hôte a la main** : un animateur voit les réponses avant la révélation, et l'hôte peut exclure ou bannir.
+- **L'hôte a la main** : un animateur voit les réponses avant la révélation, et l'hôte peut exclure ou bannir. Tout passe par l'hôte : quand tu bloques quelqu'un dans un salon, son hôte sait qui (seulement les personnes présentes dans ce salon, jamais ta liste entière), et c'est lui qui arrête de faire passer les messages entre vous.
 - **Un bannissement vise une identité, pas une adresse IP** (une IP change avec un VPN, et WebRTC la rend peu fiable). Une nouvelle identité coûte une preuve de travail d'une vingtaine de secondes dans Firefox, une seule fois : ça empêche de revenir des milliers de fois, pas de se créer quelques nouvelles identités.
 - Déclaration sur addons.mozilla.org : `personalCommunications` (le chat des salons).
 
@@ -68,7 +69,7 @@ npm install
 npm test
 ```
 
-- `engine.test.cjs` : plusieurs moteurs dans des contextes `vm` séparés, avec un faux réseau PeerJS, de faux relais Nostr et un faux `Worker` qui fait tourner la vraie preuve de travail (difficulté réduite) : identités et codes, salons, limites, points du blind test, exclusion et bannissement, battement de cœur, sauvegarde
+- `engine.test.cjs` : plusieurs moteurs dans des contextes `vm` séparés, avec un faux réseau PeerJS, de faux relais Nostr et un faux `Worker` qui fait tourner la vraie preuve de travail (difficulté réduite) : identités et codes, salons, limites, points du blind test, exclusion, bannissement et blocage, battement de cœur, sauvegarde
 - `sidebar.test.cjs` et `join.test.cjs` : la vraie barre latérale et la vraie page invité dans jsdom, reliées à de vrais moteurs
 - `e2e/run.py` : deux Firefox invisibles et séparés, sur le vrai réseau (`pip install -r tests/e2e/requirements.txt`, puis `python tests/e2e/run.py`)
 

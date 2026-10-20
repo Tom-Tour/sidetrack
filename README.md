@@ -14,7 +14,8 @@ A Firefox extension to play local YouTube playlists in the sidebar while you bro
 - **Points**: written guesses scored out of 10 (full points for a guess recognized as right, partial points from 4 letters in a row in common with the title, only each player's best guess counts), or everyone judges themselves (Got it / Missed)
 - **Rooms** (🌐): one field to create or join a room by name, public rooms listed right below. Friends join with a link (no install needed) or from their own Sidetrack. Watch in sync with a chat; guests suggest videos, chapters or moments, and a YouTube link posted in the chat can be added to the host's playlist with one click
 - **Blind test in a room**, two ways: **❓ Blind test**, where the host plays along and sees nothing in advance, or **🎤 Quizmaster**, where the host sees everything (titles, video, guesses) and gives the points by hand or lets them be counted. Guesses stay hidden until the reveal, unless a player switches 🔒 → 💬 to chat in the open
-- **Identity codes**: 4 characters next to every name (players, chat, banned list), tied to each person's identity; kicking or banning goes through a person card that spells out the consequences
+- **Identity codes**: 4 characters next to every name (players, chat, blocked and banned lists), tied to each person's identity; kicking, banning or blocking goes through a person card that spells out the consequences
+- **Block** someone in another person's room (click their name, then Block… and confirm): their messages and chip disappear for you, yours for them, in every room, and they can't enter the rooms you create. Blocking the host leaves the room and closes their rooms to you
 - **Ready-made playlists** (📚): video game music, epic dark fantasy and space soundtracks, anime openings (official uploads only: artists, composers, labels, publishers, so listening pays the people who made them), and the video game music DJ mixes of dedeco, one round per track in chapter mode
 - **Backup** of your playlists to a file, and restore
 - Toolbar button: opens or closes the sidebar, with a badge for room messages that arrived while it was closed
@@ -35,7 +36,7 @@ Sidetrack has no server and no analytics: nothing is sent to the developer. What
 
 Limits, honestly:
 - **A private room is only as private as its name**: whoever knows or guesses the name can try to join. Use a name that is hard to guess.
-- **The host is in charge**: a quizmaster sees guesses before the reveal, and the host can kick or ban.
+- **The host is in charge**: a quizmaster sees guesses before the reveal, and the host can kick or ban. Everything goes through the host, so when you block someone in a room, its host learns who (only people present in that room, never your whole list), and it's the host who stops passing messages between you.
 - **Bans target an identity, not an IP address** (IPs change with a VPN, and WebRTC makes them unreliable). A new identity costs a proof of work of about twenty seconds in Firefox, once: this stops someone from coming back thousands of times, not from making a few new identities.
 - Data declaration on addons.mozilla.org: `personalCommunications` (the room chat).
 
@@ -68,7 +69,7 @@ npm install
 npm test
 ```
 
-- `engine.test.cjs`: several engines in separate `vm` contexts with a fake PeerJS network, fake Nostr relays and a fake `Worker` running the real proof of work (lower difficulty): identities and codes, rooms, limits, blind test points, kick and ban, heartbeat, backup
+- `engine.test.cjs`: several engines in separate `vm` contexts with a fake PeerJS network, fake Nostr relays and a fake `Worker` running the real proof of work (lower difficulty): identities and codes, rooms, limits, blind test points, kick, ban and block, heartbeat, backup
 - `sidebar.test.cjs` and `join.test.cjs`: the real sidebar and guest page in jsdom, wired to real engines
 - `e2e/run.py`: two separate headless Firefox instances on the real network (`pip install -r tests/e2e/requirements.txt`, then `python tests/e2e/run.py`)
 

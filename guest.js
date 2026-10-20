@@ -3,6 +3,11 @@
 // l'hôte passe par notre propre lecteur (l'onglet masqué), recalé sur sa position.
 //
 // L'identité (clé et preuve de travail) est celle de l'extension (background.js).
+//
+// Bloquer (GUIDE.md) : les personnes bloquées disparaissent de notre chat et de nos pastilles,
+// et on dit à l'hôte de ne plus rien relayer entre elles et nous. On ne lui envoie que celles
+// qui sont dans son salon, quand elles y sont : il ne connaît pas notre liste entière. Bloquer
+// l'hôte fait quitter le salon, et ses salons nous sont fermés.
 
 // { code, status: "connecting" | "proof" | "joined" | "ended", endKey, endArgs, peer, conn,
 //   me, players, chat, host (dernier état envoyé par l'hôte), sync, latency, heard… }
@@ -41,6 +46,8 @@ async function joinRoom(code) {
     chat: [],
     secrets: [], // mes propositions masquées, pour les afficher chez moi
     host: null,
+    hostId: "",
+    blockSent: new Set(), // identités bloquées déjà signalées à l'hôte
     sync: null,
     latency: 0,
     sendTimes: [],
@@ -148,6 +155,11 @@ function onHostData(g, msg) {
   g.heard = Date.now(); // toute donnée reçue compte comme signe de vie
   switch (msg.t) {
     case "welcome":
+      g.hostId = typeof msg.hostId === "string" && /^[0-9a-f]{64}$/.test(msg.hostId) ? msg.hostId : "";
+      if (settings.blocked[g.hostId]) {
+        safeSend(g.conn, { t: "bye" });
+        return endGuest(g, "errHostBlocked");
+      }
       g.status = "joined";
       g.me = msg.you;
       g.chat = (Array.isArray(msg.chat) ? msg.chat : []).map(cleanGuestChat).filter(Boolean);
@@ -163,6 +175,7 @@ function onHostData(g, msg) {
     case "state":
       g.host = msg;
       g.players = (Array.isArray(msg.players) ? msg.players : []).map(cleanPlayer);
+      reportBlocks(g);
       break;
     case "chat": {
       const m = cleanGuestChat(msg.msg);
@@ -205,6 +218,42 @@ function onHostData(g, msg) {
       return;
   }
   update();
+}
+
+// --- Bloquer -------------------------------------------------------------------
+
+// Les personnes bloquées présentes dans le salon, pas encore signalées à l'hôte
+function reportBlocks(g) {
+  for (const p of g.players) {
+    if (!settings.blocked[p.id] || g.blockSent.has(p.id)) continue;
+    g.blockSent.add(p.id);
+    safeSend(g.conn, { t: "block", id: p.id });
+  }
+}
+
+// Depuis la fiche d'une personne du salon (ou de l'hôte, « host »)
+function guestBlock(id) {
+  const g = guest;
+  if (g?.status !== "joined") return;
+  if (id === "host") {
+    if (!g.hostId) return;
+    settings.blocked[g.hostId] = `${t("host")} · ${cleanText(g.host?.hostCode, 4)}`;
+    save();
+    safeSend(g.conn, { t: "bye" });
+    return endGuest(g, "errHostBlocked");
+  }
+  const p = g.players.find((x) => x.id === id);
+  if (!p || id === g.me) return;
+  settings.blocked[id] = `${p.name} · ${p.code}`;
+  save();
+  reportBlocks(g);
+  update();
+}
+
+function guestUnblock(id) {
+  const g = guest;
+  if (!g?.blockSent.delete(id)) return;
+  safeSend(g.conn, { t: "unblock", id });
 }
 
 // --- Lecture recalée sur l'hôte ------------------------------------------------
@@ -302,8 +351,9 @@ function guestSnapshot() {
     endKey: g.endKey,
     endArgs: g.endArgs,
     me: g.me,
-    players: g.players,
-    chat: g.chat,
+    // Les personnes bloquées n'apparaissent pas, même avant que l'hôte ait suivi
+    players: g.players.filter((p) => !settings.blocked[p.id]),
+    chat: g.chat.filter((m) => !settings.blocked[m.from]),
     host: g.host,
     hostCode: cleanText(g.host?.hostCode, 4),
     videoId: g.sync?.id ?? null,

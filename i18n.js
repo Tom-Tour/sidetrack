@@ -58,6 +58,8 @@ const STRINGS = {
     // Fiche d'un joueur (hôte) : exclure, bannir
     kickConfirmHelp: "Il quitte le salon tout de suite et ne peut plus y revenir tant que le salon reste ouvert.",
     banConfirmHelp: "Il quitte le salon tout de suite et ne pourra plus entrer dans aucun de tes salons, même plus tard. Ses messages disparaissent. Tu peux le débannir dans les réglages.",
+    blockConfirmHelp: "Tu ne verras plus ses messages ni sa pastille, et cette personne ne verra plus les tiens, dans tous les salons. Elle ne pourra pas non plus entrer dans ceux que tu crées. L'hôte du salon saura que tu l'as bloquée. Tu pourras la débloquer dans les réglages.",
+    blockHostConfirmHelp: "Tu quittes ce salon tout de suite, et tu ne pourras plus entrer dans les salons de cet hôte. Il ne pourra pas non plus entrer dans ceux que tu crées. Tu pourras le débloquer dans les réglages.",
 
     // Lecture
     modePlaylist: "🎵 Playlist",
@@ -163,6 +165,7 @@ const STRINGS = {
     errFull: "Salon complet (24 joueurs)",
     errKicked: "L'hôte t'a exclu du salon",
     errBanned: "L'hôte t'a banni de ses salons",
+    errHostBlocked: "Tu as bloqué l'hôte de ce salon",
 
     // Bandeau
     noticeExportEmpty: "Playlist vide : rien à exporter.",
@@ -278,6 +281,8 @@ const STRINGS = {
 
     kickConfirmHelp: "They leave the room right away and can't come back while the room stays open.",
     banConfirmHelp: "They leave the room right away and won't be able to enter any of your rooms, even later. Their messages disappear. You can unban them in the settings.",
+    blockConfirmHelp: "You won't see their messages or their chip anymore, and they won't see yours, in every room. They won't be able to enter the rooms you create either. The room's host will know you blocked them. You can unblock them in the settings.",
+    blockHostConfirmHelp: "You leave this room right away and won't be able to enter this host's rooms anymore. They won't be able to enter the rooms you create either. You can unblock them in the settings.",
 
     modePlaylist: "🎵 Playlist",
     modeBlind: "❓ Blind test",
@@ -378,6 +383,7 @@ const STRINGS = {
     errFull: "Room full (24 players)",
     errKicked: "The host kicked you from the room",
     errBanned: "The host banned you from their rooms",
+    errHostBlocked: "You blocked the host of this room",
 
     noticeExportEmpty: "Empty playlist: nothing to export.",
     noticeExported:

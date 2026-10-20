@@ -16,7 +16,10 @@
 //   côté du nom : un banni ne revient pas avec des milliers de nouvelles identités ;
 // - limites fixes (LIMITS) : au-delà, les messages sont ignorés, et qui insiste est mis en
 //   sourdine une minute ; tout ce qui arrive des invités est nettoyé ;
-// - battement de cœur (HEARTBEAT) : une connexion muette depuis 30 s est fermée.
+// - battement de cœur (HEARTBEAT) : une connexion muette depuis 30 s est fermée ;
+// - bloquer : un invité qui bloque quelqu'un nous envoie son identité, et l'hôte ne relaie
+//   plus rien entre eux (messages, pastilles), dans les deux sens. Une personne que l'hôte a
+//   bloquée dans le salon d'un autre n'entre pas dans les siens.
 //
 // Un salon public est en plus annoncé sur des relais Nostr publics (nostr-tools), d'où
 // la liste des salons disponibles. Annonces signées avec une clé jetable par salon,
@@ -138,6 +141,25 @@ function broadcast(msg, except = null) {
   }
 }
 
+// Deux invités dont l'un a bloqué l'autre : rien ne passe entre eux
+function apart(a, b) {
+  return !!(room?.players.get(a)?.blocks.has(b) || room?.players.get(b)?.blocks.has(a));
+}
+
+// Message d'un invité : à tous, sauf à ceux qui l'ont bloqué ou qu'il a bloqués
+function broadcastFrom(from, msg) {
+  if (!room) return;
+  for (const p of room.players.values()) {
+    if (!apart(from, p.id)) safeSend(p.conn, msg);
+  }
+}
+
+// État du salon vu par un invité : sans les pastilles des personnes bloquées
+function stateFor(p, pub) {
+  const players = pub.players.filter((x) => !apart(p.id, x.id));
+  return players.length === pub.players.length ? pub : { ...pub, players };
+}
+
 // Battement de cœur : un ping à chacun, et qui ne donne plus signe de vie depuis SILENCE est
 // retiré (sinon il resterait en fantôme et reviendrait en double)
 function heartbeat() {
@@ -191,8 +213,9 @@ function onConnData(conn, msg) {
     // Poignée de main valide : signée par l'identité, pour ce salon et ce défi, récente
     const id = verifyHello(msg.ev, { room: room.code, challenge: entry.challenge });
     if (!id) return conn.close();
-    if (settings.banned[id] || room.kicked.has(id)) {
-      safeSend(conn, { t: settings.banned[id] ? "banned" : "kicked" });
+    // Une personne bloquée n'entre pas non plus : pour elle, c'est comme un bannissement
+    if (settings.banned[id] || settings.blocked[id] || room.kicked.has(id)) {
+      safeSend(conn, { t: settings.banned[id] || settings.blocked[id] ? "banned" : "kicked" });
       return setTimeout(() => conn.close(), 300);
     }
     const nonce = Number(msg.ev.tags.find((x) => x[0] === "pow")?.[1]);
@@ -240,6 +263,7 @@ function admit(conn, entry, id, code, rawName) {
     name: guestName(rawName),
     color: colorFor(id),
     score: old?.score ?? 0,
+    blocks: old?.blocks ?? new Set(), // identités que cet invité a bloquées
     chatTimes: [],
     metaTimes: [],
     lastSeen: Date.now(),
@@ -247,8 +271,9 @@ function admit(conn, entry, id, code, rawName) {
     mutedUntil: 0,
   };
   room.players.set(id, player);
-  safeSend(conn, { t: "welcome", code: room.code, you: id, myCode: code, name: player.name, chat: room.chat.map(publicChat) });
-  safeSend(conn, publicState());
+  const chat = room.chat.filter((m) => !apart(id, m.from)).map(publicChat);
+  safeSend(conn, { t: "welcome", code: room.code, you: id, myCode: code, name: player.name, hostId: identity.pubkey, chat });
+  safeSend(conn, stateFor(player, publicState()));
   if (lastSync) safeSend(conn, lastSync);
   if (!old) systemMessage("sysJoined", player.name);
   else update();
@@ -297,6 +322,10 @@ function onPlayerData(p, msg) {
     case "claim":
       claim(p.id, msg.found === true);
       break;
+    case "block":
+    case "unblock":
+      setBlock(p, msg.t === "block", msg.id);
+      break;
     case "ping":
       safeSend(p.conn, { t: "pong", at: Number(msg.at) || 0 });
       break;
@@ -322,6 +351,24 @@ function kick(id, permanent = false) {
   safeSend(p.conn, { t: permanent ? "banned" : "kicked" });
   setTimeout(() => p.conn.close(), 300);
   systemMessage(permanent ? "sysBanned" : "sysKicked", p.name);
+}
+
+// Un invité bloque (ou débloque) quelqu'un du salon. Il n'envoie que les identités présentes,
+// au fur et à mesure : l'hôte ne connaît pas sa liste entière.
+function setBlock(p, on, id) {
+  if (typeof id !== "string" || !/^[0-9a-f]{64}$/.test(id) || id === p.id) return;
+  if (on) {
+    if (p.blocks.size >= 100) return;
+    p.blocks.add(id);
+    // Les messages déjà affichés disparaissent, des deux côtés
+    safeSend(p.conn, { t: "chatRemove", from: id });
+    const other = room.players.get(id);
+    if (other) safeSend(other.conn, { t: "chatRemove", from: p.id });
+  } else {
+    p.blocks.delete(id);
+  }
+  lastPublic = ""; // les pastilles changent pour eux deux
+  update();
 }
 
 // Référence envoyée par un invité : une vidéo de la playlist, un chapitre ou un moment
@@ -486,7 +533,7 @@ function addChat({ secret = true, ...entry }) {
   };
   room.chat.push(msg);
   if (room.chat.length > CHAT_LIMIT) room.chat.shift();
-  broadcast({ t: "chat", msg: publicChat(msg) });
+  broadcastFrom(msg.from, { t: "chat", msg: publicChat(msg) });
   if (fromGuest) noteMessage();
   update();
 }
@@ -515,7 +562,7 @@ function unmaskGuesses() {
   for (const msg of room.chat) {
     if (!msg.private) continue;
     msg.private = false;
-    broadcast({ t: "chatUpdate", msg: publicChat(msg) });
+    broadcastFrom(msg.from, { t: "chatUpdate", msg: publicChat(msg) });
   }
 }
 
@@ -622,7 +669,7 @@ function roomUpdate() {
   const json = JSON.stringify(pub);
   if (json === lastPublic) return;
   lastPublic = json;
-  broadcast(pub);
+  for (const p of room.players.values()) safeSend(p.conn, stateFor(p, pub));
 }
 
 // Position de lecture de l'hôte, relayée aux invités (à chaque changement, sinon toutes les 2 s)
