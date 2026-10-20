@@ -128,6 +128,7 @@ li.loading > .row::after {
 #chat .ref, #chat .tc { color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 10px; margin: 0 2px; }
 #chat-form { display: flex; gap: 4px; margin-top: 4px; }
 #chat-input { flex: 1; min-width: 0; }
+#chat .yt { color: var(--accent); overflow-wrap: anywhere; }
 
 #blind-status { margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
 #blind-status strong { font-size: 15px; }

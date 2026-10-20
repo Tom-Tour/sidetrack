@@ -17,7 +17,7 @@ let state = {
   current: null,       // id de la playlist affichée
   index: -1,           // morceau en cours dans la playlist
   shuffle: false,
-  mode: "listen",      // "listen" | "blind"
+  mode: "listen",      // "listen" | "blind" | "emcee" (blind test animé par l'hôte d'un salon)
   // startMode : "start" début du morceau | "random" moment aléatoire | "chapter" chapitre aléatoire
   // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
   blind: { clip: -1, startMode: "chapter", hideVideo: true },
@@ -37,6 +37,16 @@ let playerShown = false; // onglet du lecteur affiché (bouton 📺 allumé)
 let importTarget = null;
 let notice = null;     // { key, args?, focus? } : traduit par la barre latérale
 let logLines = [];
+
+// Blind test, joué (« blind ») ou animé par l'hôte d'un salon (« emcee ») : même partie,
+// mais l'animateur voit tout (titres, vidéo, propositions) et ne joue pas
+function inGame() {
+  return state.mode === "blind" || state.mode === "emcee";
+}
+
+function emcee() {
+  return state.mode === "emcee" && !!room;
+}
 
 // Partie de blind test en cours (non sauvegardée)
 let game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0 };
@@ -395,7 +405,7 @@ function warmPlayer() {
 // l'onglet s'affiche (premier chargement, clic sur « Lancer Sidetrack », nouvel essai…)
 function videoHidden() {
   if (inGuestRoom()) return guestHidesVideo();
-  return state.mode === "blind" && !room && state.blind.hideVideo && game.phase !== "revealed";
+  return state.mode === "blind" && state.blind.hideVideo && game.phase !== "revealed";
 }
 
 function syncCover() {
@@ -418,7 +428,7 @@ async function focusPlayer(toggle = false) {
   // 📺 est inactif en blind test solo ; seul l'écran « Lancer Sidetrack » peut y emmener.
   // Dans un salon, l'hôte est l'arbitre : il garde l'accès à la vidéo ; un invité la voit
   // quand l'hôte ne la cache pas.
-  const hidden = inGuestRoom() ? guestHidesVideo() : state.mode === "blind" && !room;
+  const hidden = inGuestRoom() ? guestHidesVideo() : state.mode === "blind";
   if (playerTabId == null || !playerPort || (toggle && hidden)) return;
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
   if (active?.id === playerTabId) {
@@ -516,7 +526,7 @@ function onPlayerMessage(msg) {
           backToBrowsing();
         }, 2500);
       }
-      if (state.mode === "blind" && game.phase === "playing") {
+      if (inGame() && game.phase === "playing") {
         // Dernier chapitre en « durée du chapitre » : sa fin dépend de la durée de la vidéo
         if (game.clip == null && game.chapter) {
           game.clip = Math.max(5, Math.floor(msg.duration - game.chapter.start));
@@ -545,7 +555,7 @@ function onPlayerMessage(msg) {
         break;
       }
       if (inGuestRoom()) break; // la suite dépend de l'hôte
-      if (state.mode === "blind") setTimeout(nextRound, 1000);
+      if (inGame()) setTimeout(nextRound, 1000);
       else setTimeout(next, 1500);
       break;
     case "playlist": {
@@ -656,7 +666,7 @@ async function startGame() {
 // Sans partie en cours, on en commence une faite des manches choisies à la main.
 async function blindPick(i, chapter = null) {
   const item = items()[i];
-  if (!item || state.mode !== "blind" || game.phase === "loading") return;
+  if (!item || !inGame() || game.phase === "loading") return;
   if (chapter != null) {
     await ensureChapters([item]);
     if (!item.chapters?.[chapter]) return;
@@ -737,10 +747,12 @@ function answer(found) {
 
 // Changer de mode ne coupe pas la musique : seul « Démarrer la partie » lance le blind test.
 function setMode(mode) {
-  if (state.mode === mode) return;
+  if (state.mode === mode || (mode === "emcee" && !room)) return;
+  const wasGame = inGame();
   state.mode = mode;
-  resetGame();
-  if (mode === "blind" && !room) hidePlayerTab();
+  // Passer du blind test joué au blind test animé garde la partie en cours
+  if (!(wasGame && inGame())) resetGame();
+  if (mode === "blind") hidePlayerTab(); // on joue : la vidéo ne doit pas rester sous les yeux
   update();
   save();
 }
@@ -777,10 +789,10 @@ const actions = {
   closeRoom: () => closeRoom(),
   joinRoom: (code) => joinRoom(code),
   leaveRoom: () => leaveRoom(),
-  guestChat: (text) => guestChat(text),
+  guestChat: (text, secret) => guestChat(text, secret),
   guestRef: (ref) => guestRef(ref),
   shareMoment: () => shareMoment(),
-  hostChat: (text) => hostChat(text),
+  hostChat: (text, secret) => hostChat(text, null, secret),
   award: (playerId, delta) => award(playerId, delta),
   kick: (playerId) => kick(playerId, false),
   ban: (playerId) => kick(playerId, true),
@@ -854,6 +866,7 @@ browser.storage.local.get("sidetrack").then((s) => {
     }
   }
   if (!state.banned || typeof state.banned !== "object") state.banned = {};
+  if (state.mode === "emcee") state.mode = "blind"; // pas de salon au démarrage
   setLang(state.lang);
   if (!state.playlists.length) newPlaylist(t("defaultPlaylist"));
   if (!playlist()) state.current = state.playlists[0].id;

@@ -54,6 +54,8 @@ const STRINGS = {
     banned: "L'hôte t'a banni de ses salons.",
     muted: "Trop de messages : tu es en sourdine pendant 1 minute.",
     tooFast: "Doucement : 2 messages par seconde au plus.",
+    secretOn: "Réponse cachée jusqu'à la révélation (clique pour écrire en clair)",
+    secretOff: "Message visible par tous (clique pour cacher ta réponse)",
     ipNotice: "Connexion directe avec l'hôte (pair-à-pair) : il voit ton adresse IP, comme dans tout échange de ce type.",
   },
   en: {
@@ -104,6 +106,8 @@ const STRINGS = {
     banned: "The host banned you from their rooms.",
     muted: "Too many messages: you're muted for 1 minute.",
     tooFast: "Slow down: 2 messages per second at most.",
+    secretOn: "Answer hidden until the reveal (click to write in the open)",
+    secretOff: "Message visible to everyone (click to hide your answer)",
     ipNotice: "Direct connection with the host (peer-to-peer): they can see your IP address, as in any such exchange.",
   },
 };
@@ -483,14 +487,28 @@ function flash(text) {
   flashTimer = setTimeout(() => ($("#chat-note").hidden = true), 4000);
 }
 
+// En blind test, chacun choisit d'écrire sa réponse cachée (par défaut) ou en clair
+let secretGuess = true;
+$("#chat-secret").addEventListener("click", () => {
+  secretGuess = !secretGuess;
+  renderSecret();
+});
+
+function renderSecret() {
+  const b = $("#chat-secret");
+  b.hidden = !room?.blind;
+  b.textContent = secretGuess ? "🔒" : "💬";
+  b.title = t(secretGuess ? "secretOn" : "secretOff");
+}
+
 $("#chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("#chat-input").value.trim();
   if (!text) return;
   if (!rateOk(sendTimes, 2)) return flash(t("tooFast"));
-  // En blind test, l'hôte masque la proposition pour les autres : on la garde pour soi
-  if (room?.blind && ["playing", "timeup"].includes(room.blind.phase)) mySecrets.push(text);
-  send({ t: "chat", text });
+  // Réponse cachée pendant une manche : masquée pour les autres, on la garde pour soi
+  if (secretGuess && room?.blind && ["playing", "timeup"].includes(room.blind.phase)) mySecrets.push(text);
+  send({ t: "chat", text, secret: secretGuess });
   $("#chat-input").value = "";
 });
 
@@ -530,7 +548,8 @@ function renderChat() {
       // Messages système : clés traduites ici, dans la langue de l'invité
       if (msg.system) return el("p", msg.key ? t(msg.key, ...(msg.args ?? [])) : msg.text ?? "", "system");
       if (msg.masked) {
-        return msg.mine ? el("p", t("yourGuess", msg.mine), "masked") : el("p", t("someoneGuessed", msg.name), "masked");
+        const who = msg.from === "host" ? t("host") : msg.name;
+        return msg.mine ? el("p", t("yourGuess", msg.mine), "masked") : el("p", t("someoneGuessed", who), "masked");
       }
       const p = el("p");
       const who = p.appendChild(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
@@ -582,6 +601,7 @@ function renderQueue() {
 }
 
 function render() {
+  renderSecret();
   $("#players").replaceChildren(
     ...room.players.map((p) => {
       const li = el("li", p.name, p.id === me ? "me" : "");

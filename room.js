@@ -156,6 +156,7 @@ function closeRoom() {
   if (room.public) stopAnnouncing();
   broadcast({ t: "closed" });
   clearInterval(room.sweep);
+  if (state.mode === "emcee") state.mode = "blind"; // l'animation n'existe que dans un salon
   const { peer } = room;
   room = null;
   setTimeout(() => peer.destroy(), 300); // laisse partir le message de fermeture
@@ -347,7 +348,7 @@ function onPlayerData(p, msg) {
 
   switch (msg.t) {
     case "chat":
-      addChat({ from: p.id, name: p.name, color: p.color, text: cleanText(msg.text, TEXT_MAX), ref: cleanRef(msg.ref) });
+      addChat({ from: p.id, name: p.name, color: p.color, text: cleanText(msg.text, TEXT_MAX), ref: cleanRef(msg.ref), secret: msg.secret !== false });
       break;
     case "ping":
       safeSend(p.conn, { t: "pong", at: Number(msg.at) || 0 });
@@ -458,7 +459,7 @@ function looksRight(guess, parts) {
 }
 
 function guessHint(text) {
-  if (state.mode !== "blind" || !["playing", "timeup", "revealed"].includes(game.phase) || !text) return false;
+  if (!inGame() || !["playing", "timeup", "revealed"].includes(game.phase) || !text) return false;
   const item = items()[state.index];
   if (!item) return false;
   return looksRight(text, answerParts(game.chapter?.title, game.chapter ? null : item.title));
@@ -466,20 +467,23 @@ function guessHint(text) {
 
 // --- Chat ------------------------------------------------------------------
 
-// Pendant une manche de blind test, les propositions restent privées (visibles de l'hôte)
+// Pendant une manche de blind test, les propositions restent cachées jusqu'à la révélation :
+// à tous sauf l'animateur, ou à tout le monde si l'hôte joue lui aussi. Chacun peut choisir
+// d'écrire en clair (secret: false) pour discuter.
 function guessing() {
-  return state.mode === "blind" && (game.phase === "playing" || game.phase === "timeup");
+  return inGame() && (game.phase === "playing" || game.phase === "timeup");
 }
 
-function addChat(entry) {
+function addChat({ secret = true, ...entry }) {
   if (!entry.text && !entry.ref && !entry.system) return;
   const fromGuest = !entry.system && entry.from !== "host";
+  const player = fromGuest || (entry.from === "host" && state.mode === "blind"); // l'hôte joue
   const msg = {
+    ...entry,
     id: ++chatSeq,
     at: Date.now(),
-    private: fromGuest && guessing(),
+    private: player && secret && guessing(),
     hint: fromGuest && guessHint(entry.text), // jamais envoyé aux invités
-    ...entry,
   };
   room.chat.push(msg);
   if (room.chat.length > CHAT_LIMIT) room.chat.shift();
@@ -500,9 +504,9 @@ function systemMessage(key, ...args) {
 }
 
 // Le nom « Hôte » est traduit à l'affichage (from === "host")
-function hostChat(text, ref = null) {
+function hostChat(text, ref = null, secret = true) {
   if (!room || !rateOk(hostTimes, HOST_SEND_PER_SECOND)) return;
-  addChat({ from: "host", name: "", text: cleanText(text, TEXT_MAX), ref });
+  addChat({ from: "host", name: "", text: cleanText(text, TEXT_MAX), ref, secret: secret !== false });
 }
 
 // À la révélation, les propositions de la manche deviennent visibles de tous
@@ -535,7 +539,7 @@ function playerList() {
 }
 
 function publicState() {
-  const listen = state.mode === "listen";
+  const listen = !inGame();
   const item = items()[state.index];
   return {
     t: "state",
@@ -631,8 +635,8 @@ function publishAnnouncement(content, ttl) {
 }
 
 function announcement() {
-  const inGame = state.mode === "blind" && !["idle", "over"].includes(game.phase);
-  return { code: room.code, players: room.players.size, mode: state.mode, game: inGame };
+  const playing = inGame() && !["idle", "over"].includes(game.phase);
+  return { code: room.code, players: room.players.size, mode: inGame() ? "blind" : "listen", game: playing };
 }
 
 function announce() {

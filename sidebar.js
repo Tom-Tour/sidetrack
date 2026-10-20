@@ -185,7 +185,7 @@ $("#chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("#chat-input").value.trim();
   if (!text) return;
-  act(view.guest ? "guestChat" : "hostChat", text);
+  act(view.guest ? "guestChat" : "hostChat", text, secretGuess);
   $("#chat-input").value = "";
 });
 
@@ -199,6 +199,14 @@ $("#show-player").addEventListener("click", () => act("togglePlayerTab"));
 $("#volume").addEventListener("input", (e) => act("setVolume", Number(e.target.value)));
 $("#mode-listen").addEventListener("click", () => act("setMode", "listen"));
 $("#mode-blind").addEventListener("click", () => act("setMode", "blind"));
+$("#mode-emcee").addEventListener("click", () => act("setMode", "emcee"));
+
+// Blind test : chacun choisit d'écrire sa réponse cachée (par défaut) ou en clair
+let secretGuess = true;
+$("#chat-secret").addEventListener("click", () => {
+  secretGuess = !secretGuess;
+  render();
+});
 
 $("#clip").addEventListener("change", (e) => act("setBlind", "clip", Number(e.target.value)));
 $("#startMode").addEventListener("change", (e) => act("setBlind", "startMode", e.target.value));
@@ -239,16 +247,22 @@ function renderNotice() {
   row.appendChild(button(t("ok"), () => act("dismissNotice")));
 }
 
-// Texte de chat : les timecodes (1:23, 1:02:03) deviennent des boutons pour l'hôte
-const TIMECODE = /\b(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\b/g;
+// Texte de chat, pour l'hôte : un lien YouTube s'ajoute à la playlist d'un clic (＋),
+// un timecode (1:23, 1:02:03) amène tout le salon à ce moment
+const CHAT_LINKS = /(https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?\S*|shorts\/\S+|live\/\S+|playlist\?\S*)|youtu\.be\/\S+))|\b(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\b/g;
 
 function chatText(parent, text) {
   let last = 0;
-  for (const m of text.matchAll(TIMECODE)) {
+  for (const m of text.matchAll(CHAT_LINKS)) {
     parent.append(text.slice(last, m.index));
-    const seconds = (Number(m[1] ?? 0) * 60 + Number(m[2])) * 60 + Number(m[3]);
-    parent.appendChild(button(m[0], () => act("seek", seconds), "tc")).title = t("seekAll");
     last = m.index + m[0].length;
+    if (m[1]) {
+      parent.appendChild(el("span", m[1], "yt"));
+      parent.appendChild(button("＋", () => act("addLink", m[1]), "ref")).title = t("addToPlaylist");
+      continue;
+    }
+    const seconds = (Number(m[2] ?? 0) * 60 + Number(m[3])) * 60 + Number(m[4]);
+    parent.appendChild(button(m[0], () => act("seek", seconds), "tc")).title = t("seekAll");
   }
   parent.append(text.slice(last));
 }
@@ -276,13 +290,18 @@ function renderPublicRooms() {
 
 // Ligne de chat. Hôte : timecodes et vidéos proposées cliquables (pour tout le salon),
 // indice « probable », +1. Invité : propositions masquées pendant une manche.
-function chatLine(msg, { guest, blind }) {
+function chatLine(msg, { guest, blind, playing }) {
   if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "system");
-  if (msg.masked) return el("p", msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", msg.name), "masked");
+  const who = (m) => (m.from === "host" ? t("host") : m.name);
+  if (msg.masked) return el("p", msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", who(msg)), "masked");
+  // L'hôte joue (onglet Blind test) : pendant la manche, il ne voit que ses propres réponses
+  if (playing && msg.private) {
+    return el("p", msg.from === "host" ? t("yourGuess", msg.text ?? "") : t("someoneGuessed", who(msg)), "masked");
+  }
   const p = el("p", null, msg.private ? "private" : "");
   if (msg.private) p.append("🔒 ");
-  const who = p.appendChild(el("b", `${msg.from === "host" ? t("host") : msg.name} : `));
-  if (msg.color) who.style.color = msg.color;
+  const name = p.appendChild(el("b", `${who(msg)} : `));
+  if (msg.color) name.style.color = msg.color;
   if (msg.text) {
     if (guest) p.append(msg.text);
     else chatText(p, msg.text);
@@ -294,7 +313,7 @@ function chatLine(msg, { guest, blind }) {
     p.append(guest ? el("span", label, "ref plain") : button(label, () => act("playRef", msg.ref), "ref"));
   }
   // En blind test, l'hôte donne les points directement depuis une proposition
-  if (!guest && blind && msg.from !== "host") p.append(button("+1", () => act("award", msg.from, 1)));
+  if (!guest && blind && msg.from !== "host" && !msg.system) p.append(button("+1", () => act("award", msg.from, 1)));
   return p;
 }
 
@@ -381,7 +400,15 @@ function renderRoom(blind) {
 
   const chat = $("#chat");
   const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
-  chat.replaceChildren(...room.chat.map((msg) => chatLine(msg, { guest: !!guest, blind })));
+  const playing = !guest && view.state.mode === "blind";
+  chat.replaceChildren(...room.chat.map((msg) => chatLine(msg, { guest: !!guest, blind, playing })));
+
+  // Bouton 🔒/💬 devant le champ : en blind test, pour les joueurs (pas pour l'animateur)
+  const plays = guest ? !!guest.host?.blind : playing;
+  $("#chat-secret").hidden = !plays;
+  $("#chat-secret").textContent = secretGuess ? "🔒" : "💬";
+  $("#chat-secret").title = t(secretGuess ? "secretOn" : "secretOff");
+  $("#chat-secret").classList.toggle("on", secretGuess);
   if (atBottom) chat.scrollTop = chat.scrollHeight;
 }
 
@@ -448,7 +475,7 @@ function renderGuest(g) {
   );
 }
 
-function renderBlind(game, n, multi) {
+function renderBlind(game, n, multi, room = multi) {
   const status = $("#blind-status");
   const actions = $("#blind-actions");
   const total = game.order.length;
@@ -501,7 +528,7 @@ function renderBlind(game, n, multi) {
       break;
   }
   $("#blind-settings").hidden = !multi && !["idle", "over"].includes(game.phase);
-  $("#hideVideo-label").textContent = t(multi ? "hideVideoGuests" : "hideVideo");
+  $("#hideVideo-label").textContent = t(room ? "hideVideoGuests" : "hideVideo");
 }
 
 // Hôte d'un salon : lecture / pause du morceau de la manche (pour réécouter, faire durer…)
@@ -613,6 +640,8 @@ function renderHostTracks(game) {
 function render() {
   const { state, game } = view;
   const multi = !!view.room;
+  // Animateur (hôte d'un salon, onglet 🎤) : il voit tout. Sinon, en blind test, on joue.
+  const referee = multi && state.mode === "emcee";
 
   if (!editing) {
     $("#pl-select").replaceChildren(
@@ -625,11 +654,13 @@ function render() {
   }
   renderNotice();
 
-  const blind = state.mode === "blind";
-  // Dans un salon, l'hôte est l'arbitre : il voit tout, même pendant une manche
-  const secret = blind && !multi && ["playing", "timeup"].includes(game.phase);
+  const blind = state.mode === "blind" || state.mode === "emcee";
+  // On joue (seul, ou avec ses invités) : rien n'est dévoilé pendant la manche
+  const secret = blind && !referee && ["playing", "timeup"].includes(game.phase);
   $("#mode-listen").classList.toggle("on", !blind);
-  $("#mode-blind").classList.toggle("on", blind);
+  $("#mode-blind").classList.toggle("on", blind && !referee);
+  $("#mode-emcee").classList.toggle("on", referee);
+  $("#mode-emcee").hidden = !multi;
   renderRoom(blind);
   renderSettings(state);
 
@@ -648,22 +679,22 @@ function render() {
   const current = items()[state.index];
   const art = $("#art");
   const showArt =
-    current && (!blind || multi || game.phase === "revealed" || (secret && !state.blind.hideVideo));
+    current && (!blind || referee || game.phase === "revealed" || (secret && !state.blind.hideVideo));
   art.hidden = !showArt;
   if (showArt) {
     const src = `https://i.ytimg.com/vi/${current.id}/mqdefault.jpg`;
     if (art.src !== src) art.src = src;
   }
-  $("#show-player").hidden = blind && !multi;
+  $("#show-player").hidden = blind && !referee;
   $("#mask").hidden = !(secret && state.blind.hideVideo);
   $("#mask-time").textContent =
     game.phase === "timeup" ? t("timeUp") : game.clip ? formatTime(game.remaining) : "";
   // Une fois révélé (ou pour l'arbitre), en partie par chapitres, la réponse est le titre du chapitre
   const answer =
-    blind && (multi || game.phase === "revealed") && game.chapter?.title
+    blind && (referee || game.phase === "revealed") && game.chapter?.title
       ? `${game.chapter.title} · ${current?.title ?? ""}`
       : current?.title;
-  const timer = blind && multi && game.phase === "playing" && game.clip ? ` · ${formatTime(game.remaining)}` : "";
+  const timer = blind && referee && game.phase === "playing" && game.clip ? ` · ${formatTime(game.remaining)}` : "";
   $("#now").textContent = secret ? t("mystery") : (answer ?? t("nothingPlaying")) + timer;
 
   $("#toggle").textContent = view.playerState === 1 ? "⏸" : "▶";
@@ -676,9 +707,9 @@ function render() {
   if (document.activeElement !== $("#startMode")) $("#startMode").value = state.blind.startMode;
   $("#hideVideo").checked = state.blind.hideVideo;
 
-  $("#host-tracks").hidden = !(blind && multi);
-  if (blind && multi) renderHostTracks(game);
-  if (blind) renderBlind(game, items().length, multi);
+  $("#host-tracks").hidden = !referee;
+  if (referee) renderHostTracks(game);
+  if (blind) renderBlind(game, items().length, referee, multi);
   else renderQueue(state.index);
 }
 

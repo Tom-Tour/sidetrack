@@ -316,12 +316,13 @@ function guestSend(msg) {
   return true;
 }
 
-function guestChat(text) {
+function guestChat(text, secret = true) {
   text = cleanText(text, TEXT_MAX);
   if (!text || !guest) return;
-  // En blind test, l'hôte masque la proposition pour les autres : on la garde pour soi
+  secret = secret !== false;
+  // En blind test, une réponse cachée est masquée pour les autres : on la garde pour soi
   const phase = guest.host?.blind?.phase;
-  if (guestSend({ t: "chat", text }) && (phase === "playing" || phase === "timeup")) guest.secrets.push(text);
+  if (guestSend({ t: "chat", text, secret }) && secret && (phase === "playing" || phase === "timeup")) guest.secrets.push(text);
 }
 
 // Proposer une vidéo, un chapitre ou un moment de la playlist de l'hôte

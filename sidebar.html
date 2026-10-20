@@ -46,6 +46,7 @@
             <ul id="room-players"></ul>
             <div id="chat"></div>
             <form id="chat-form">
+              <button type="button" id="chat-secret" class="icon" hidden></button>
               <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
               <button type="submit" data-i18n="sendChat"></button>
             </form>
@@ -54,7 +55,9 @@
 
     <div id="tabs">
       <button id="mode-listen" class="tab" data-i18n="modePlaylist"></button>
-      <button id="mode-blind" class="tab" data-i18n="modeBlind"></button>
+      <button id="mode-blind" class="tab" data-i18n="modeBlind" data-i18n-title="modeBlindTitle"></button>
+      <!-- Hôte d'un salon seulement -->
+      <button id="mode-emcee" class="tab" data-i18n="modeEmcee" data-i18n-title="modeEmceeTitle" hidden></button>
     </div>
 
     <div id="stage">
