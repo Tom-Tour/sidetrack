@@ -8,14 +8,21 @@
 :root {
   --bg: #f9f9fb; --fg: #15141a; --muted: #5b5b66; --card: #fff;
   --border: #d7d7db; --accent: #0061e0; --active: #e0ecff;
-  --good: #058b00; --bad: #d70022;
+  --good: #058b00; --warn: #b85c00; --bad: #d70022;
 }
+/* Sombre : automatique, ou forcé par data-theme="dark" sur <html> ; data-theme="light"
+   force le clair (une page web peut ainsi proposer le choix) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #1c1b22; --fg: #fbfbfe; --muted: #a3a3ad; --card: #2b2a33;
     --border: #45444c; --accent: #00ddff; --active: #1f3a4d;
-    --good: #54ffbd; --bad: #ff848b;
+    --good: #54ffbd; --warn: #ffb224; --bad: #ff848b;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #1c1b22; --fg: #fbfbfe; --muted: #a3a3ad; --card: #2b2a33;
+  --border: #45444c; --accent: #00ddff; --active: #1f3a4d;
+  --good: #54ffbd; --warn: #ffb224; --bad: #ff848b;
 }
 
 * { box-sizing: border-box; }
@@ -73,6 +80,29 @@ button.chip { cursor: pointer; }
 /* Code d'identité (4 caractères) à côté d'un nom */
 .code { font: 11px ui-monospace, monospace; color: var(--muted); letter-spacing: .5px; }
 
+/* Petite pastille dans un texte (indice, référence, morceau d'adresse) ; ajouter
+   .good, .bad ou une couleur propre à l'extension si besoin */
+.pill {
+  display: inline-block; padding: 0 5px; border: 1px solid var(--border); border-radius: 10px;
+  background: none; color: inherit; font: 12px system-ui, sans-serif; line-height: 18px;
+}
+button.pill { cursor: pointer; }
+/* Bon / mauvais (réponse, résultat) : texte et bordure, après
+   .pill pour la colorer */
+.good { color: var(--good); border-color: var(--good); }
+.bad { color: var(--bad); border-color: var(--bad); }
+
+/* --- État de la connexion : point coloré --- */
+.dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.open { background: var(--good); }
+.dot.connecting { background: var(--warn); }
+.dot.error { background: var(--bad); }
+
+/* --- Création de l'identité (preuve de travail) : bandeau avec barre de progression --- */
+progress { display: block; width: 100%; height: 6px; margin: 4px 0; accent-color: var(--accent); }
+.mining p { margin: 0 0 6px; }
+.mining .title { font-weight: 600; }
+
 /* --- Compteurs --- */
 .badge { background: var(--bad); color: #fff; border-radius: 8px; padding: 0 5px; font-size: 11px; }
 /* Compteur posé sur un bouton (le bouton doit être en position: relative) */
@@ -96,12 +126,13 @@ button.chip { cursor: pointer; }
 .chat-form input { flex: 1; min-width: 0; }
 .error { color: var(--bad); }
 
-/* --- Réglages --- */
-.settings fieldset { margin: 10px 0 0; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
-.settings legend { padding: 0 4px; }
-.settings label { display: block; margin: 6px 0; }
-.settings label.check { display: flex; gap: 6px; align-items: flex-start; }
-.settings p { margin: 4px 0; }
+/* --- Réglages ; .frame donne le même cadre titré ailleurs (réglages d'une partie…) --- */
+.settings fieldset, fieldset.frame { margin: 10px 0 0; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
+fieldset.frame { margin-top: 8px; }
+.settings legend, .frame legend { padding: 0 4px; }
+.settings label, .frame label { display: block; margin: 6px 0; }
+.settings label.check, .frame label.check { display: flex; gap: 6px; align-items: flex-start; }
+.settings p, .frame p { margin: 4px 0; }
 .settings input[type=text], .settings select { width: 100%; margin-top: 2px; }
 .settings .list { list-style: none; margin: 4px 0; padding: 0; }
 .settings .list li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }

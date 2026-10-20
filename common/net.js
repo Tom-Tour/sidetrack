@@ -26,6 +26,10 @@ const LIMITS = {
 // la personne resterait affichée en fantôme et reviendrait en double.
 const HEARTBEAT = { EVERY: 5 * 1000, SILENCE: 30 * 1000 };
 
+// Couleurs du badge du bouton de la barre d'outils (GUIDE.md section 3) : rouge pour les
+// messages privés non lus, bleu pour le nombre propre à l'extension
+const BADGE_COLORS = { PRIVATE: "#e5484d", COUNT: "#0090ff" };
+
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 // Compteur glissant sur une seconde : true si l'événement passe (et il est compté)
