@@ -59,7 +59,7 @@ Rooms use [PeerJS](https://peerjs.com): each guest signs a random challenge from
 
 The `common/` folder is the shared base of my Firefox extensions (addon-kit): theme, shared vocabulary, room tools (limits, signed handshake, heartbeat), proof of work. It is never edited here, only copied from the kit.
 
-Libraries, unmodified: [PeerJS](https://peerjs.com) 1.5.4, [nostr-tools](https://github.com/nbd-wtf/nostr-tools), [scrypt-js](https://github.com/ricmoo/scrypt-js) 3.0.1 (MIT).
+Libraries, unmodified: [PeerJS](https://peerjs.com) 1.5.4, [nostr-tools](https://github.com/nbd-wtf/nostr-tools) 2.7.2, [scrypt-js](https://github.com/ricmoo/scrypt-js) 3.0.1, each with its own license file next to it (MIT; Unlicense for nostr-tools).
 
 ## Tests
 

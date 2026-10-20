@@ -59,7 +59,7 @@ Les salons passent par [PeerJS](https://peerjs.com) : chaque invité signe un d�
 
 Le dossier `common/` est la base commune de mes extensions Firefox (addon-kit) : thème, vocabulaire commun, outils des salons (limites, poignée de main signée, battement de cœur), preuve de travail. Il n'est jamais modifié ici, seulement recopié depuis le kit.
 
-Librairies, non modifiées : [PeerJS](https://peerjs.com) 1.5.4, [nostr-tools](https://github.com/nbd-wtf/nostr-tools), [scrypt-js](https://github.com/ricmoo/scrypt-js) 3.0.1 (MIT).
+Librairies, non modifiées : [PeerJS](https://peerjs.com) 1.5.4, [nostr-tools](https://github.com/nbd-wtf/nostr-tools) 2.7.2, [scrypt-js](https://github.com/ricmoo/scrypt-js) 3.0.1, chacune avec son fichier de licence à côté d'elle (MIT ; Unlicense pour nostr-tools).
 
 ## Tests
 
