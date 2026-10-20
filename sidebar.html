@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="common/theme.css">
   <link rel="stylesheet" href="sidebar.css">
 </head>
 <body>
@@ -14,10 +15,10 @@
       <button id="pl-delete" class="icon" data-i18n-title="deletePlaylist">🗑</button>
       <button id="pl-export" class="icon" data-i18n-title="exportYoutube">⤴</button>
       <button id="pl-presets" class="icon" data-i18n-title="presets">📚</button>
-      <button id="toggle-room" class="icon" data-i18n-title="room">🌐<span id="unread" hidden></span></button>
+      <button id="toggle-room" class="icon" data-i18n-title="room">🌐<span id="unread" class="badge over" hidden></span></button>
       <button id="open-settings" class="icon" data-i18n-title="settings">⚙</button>
     </div>
-    <p id="notice" hidden></p>
+    <div id="notice" class="notice" hidden></div>
 
     <!-- Playlists toutes prêtes (bouton 📚) -->
     <div id="presets" hidden>
@@ -32,9 +33,15 @@
 
     <!-- Salon (bouton 🌐) : créer ou rejoindre, salons publics ; une fois dedans, le chat -->
     <section id="online" hidden>
+      <!-- Premier lancement : la preuve de travail de l'identité se calcule une seule fois -->
+      <div id="mining" hidden>
+        <div class="line"><span id="mining-text" class="grow"></span></div>
+        <progress id="mining-bar" max="1" value="0"></progress>
+        <p class="help" data-i18n="identityMiningHelp"></p>
+      </div>
       <form id="room-form">
         <input id="room-name" type="text" data-i18n-placeholder="roomName" maxlength="24" autocomplete="off">
-        <label data-i18n-title="publicRoom"><input type="checkbox" id="room-public"> <span data-i18n="public"></span></label>
+        <label data-i18n-title="publicRoomTitle"><input type="checkbox" id="room-public"> <span data-i18n="public"></span></label>
         <button type="submit" id="room-go"></button>
       </form>
       <div id="rooms-row">
@@ -43,24 +50,25 @@
       </div>
       <ul id="public-list"></ul>
       <div id="room-panel" hidden>
-            <div id="room-head">
-              <span><span data-i18n="room"></span> <strong id="room-code"></strong> <span id="room-public-badge" data-i18n-title="publicBadge">🌐</span></span>
-              <span id="room-status" class="muted"></span>
-              <button id="room-copy" data-i18n-title="copyLinkTitle"></button>
-              <button id="room-close" class="icon" data-i18n-title="closeRoom">✕</button>
-            </div>
-            <progress id="room-progress" max="1" value="0" hidden></progress>
-            <ul id="room-players"></ul>
-            <div id="chat"></div>
-            <form id="chat-form">
-              <button type="button" id="chat-secret" class="icon" hidden></button>
-              <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
-              <button type="submit" data-i18n="sendChat"></button>
-            </form>
-          </div>
+        <div id="room-head">
+          <span><span data-i18n="room"></span> <strong id="room-code"></strong> <span id="room-public-badge" data-i18n-title="publicBadgeTitle">🌐</span></span>
+          <span id="room-status" class="muted"></span>
+          <button id="room-copy" data-i18n-title="copyLinkTitle"></button>
+          <button id="room-close" class="icon" data-i18n-title="closeRoom">✕</button>
+        </div>
+        <div id="room-players" class="chips"></div>
+        <!-- Fiche d'un joueur (clic sur son nom) : points, exclure, bannir -->
+        <div id="person" class="card" hidden></div>
+        <div id="chat" class="chat"></div>
+        <form id="chat-form" class="chat-form">
+          <button type="button" id="chat-secret" class="icon" hidden></button>
+          <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="500">
+          <button type="submit" data-i18n="send"></button>
+        </form>
+      </div>
     </section>
 
-    <div id="tabs">
+    <div id="tabs" class="tabs">
       <button id="mode-listen" class="tab" data-i18n="modePlaylist"></button>
       <button id="mode-blind" class="tab" data-i18n="modeBlind" data-i18n-title="modeBlindTitle"></button>
       <!-- Hôte d'un salon seulement -->
@@ -68,21 +76,21 @@
     </div>
 
     <div id="stage">
-    <div id="player-wrap">
-      <img id="art" alt="" hidden>
-      <div id="mask" hidden>
-        <div id="mask-icon">?</div>
-        <div id="mask-time"></div>
+      <div id="player-wrap">
+        <img id="art" alt="" hidden>
+        <div id="mask" hidden>
+          <div id="mask-icon">?</div>
+          <div id="mask-time"></div>
+        </div>
+        <div id="loading" hidden data-i18n-title="loadingVideoTitle"><div class="spinner"></div></div>
       </div>
-      <div id="loading" hidden data-i18n-title="loadingVideo"><div class="spinner"></div></div>
-    </div>
-    <div id="now"></div>
-    <!-- Blind test : le titre se dévoile peu à peu -->
-    <div id="hint" hidden><span id="hint-mask"></span> <span id="hint-max" class="muted"></span></div>
-    <div id="volume-row">
-      <label data-i18n-title="volume">🔊 <input type="range" id="volume" min="0" max="100"></label>
-      <button id="show-player" class="icon" data-i18n-title="togglePlayer">📺</button>
-    </div>
+      <div id="now"></div>
+      <!-- Blind test : le titre se dévoile peu à peu -->
+      <div id="hint" hidden><span id="hint-mask"></span> <span id="hint-max" class="muted"></span></div>
+      <div id="volume-row">
+        <label data-i18n-title="volume">🔊 <input type="range" id="volume" min="0" max="100"></label>
+        <button id="show-player" class="icon" data-i18n-title="togglePlayerTitle">📺</button>
+      </div>
     </div>
 
     <!-- Invité dans le salon de quelqu'un : c'est l'hôte qui choisit la musique -->
@@ -94,8 +102,8 @@
       </div>
       <div id="guest-listen">
         <div class="line">
-          <span class="muted" data-i18n="hostPlaylist"></span>
-          <button id="share-moment" data-i18n="shareMoment" data-i18n-title="shareMomentHelp"></button>
+          <span class="muted grow" data-i18n="hostPlaylist"></span>
+          <button id="share-moment" data-i18n="shareMoment" data-i18n-title="shareMomentTitle"></button>
         </div>
         <ol id="guest-queue"></ol>
       </div>
@@ -119,14 +127,14 @@
       <div id="solo-guess" hidden>
         <form id="guess-form" class="line">
           <input type="text" id="guess-input" data-i18n-placeholder="guessPlaceholder" autocomplete="off" maxlength="120">
-          <button type="submit" data-i18n="sendChat"></button>
+          <button type="submit" data-i18n="send"></button>
         </form>
         <ul id="guess-list"></ul>
       </div>
-      <!-- Hôte d'un salon : liste des pistes, clic = prochaine manche -->
+      <!-- Animateur : liste des pistes, clic = prochaine manche -->
       <div id="host-tracks" hidden>
         <div class="line">
-          <span id="host-tracks-title" class="muted"></span>
+          <span id="host-tracks-title" class="muted grow"></span>
           <button id="host-tracks-toggle"></button>
         </div>
         <ol id="host-queue"></ol>
@@ -149,8 +157,8 @@
             <option value="chapter" data-i18n="startChapter"></option>
           </select>
         </label>
-        <label><input type="checkbox" id="hideVideo"> <span id="hideVideo-label"></span></label>
-        <label><input type="checkbox" id="hints"> <span data-i18n="hints"></span></label>
+        <label class="check"><input type="checkbox" id="hideVideo"> <span id="hideVideo-label"></span></label>
+        <label class="check"><input type="checkbox" id="hints"> <span data-i18n="hints"></span></label>
         <label><span data-i18n="pause"></span>
           <select id="pause">
             <option value="0" data-i18n="pauseManual"></option>
@@ -179,48 +187,69 @@
     </section>
   </main>
 
-  <main id="settings" hidden>
+  <main id="settings" class="settings" hidden>
     <div class="line">
       <button id="close-settings" data-i18n="back"></button>
       <strong data-i18n="settings"></strong>
     </div>
+
     <fieldset>
+      <legend data-i18n="general"></legend>
       <label><span data-i18n="language"></span>
-        <select id="lang">
+        <select id="set-lang">
           <option value="auto" data-i18n="langAuto"></option>
           <option value="fr">Français</option>
           <option value="en">English</option>
         </select>
       </label>
-      <label><input type="checkbox" id="show-multi"> <span data-i18n="showMulti"></span></label>
-      <p class="muted" data-i18n="showMultiHelp"></p>
-      <label><input type="checkbox" id="show-presets"> <span data-i18n="showPresets"></span></label>
-      <label><input type="checkbox" id="hide-tab"> <span data-i18n="hideTab"></span></label>
-      <p class="muted" data-i18n="hideTabHelp"></p>
-      <label><input type="checkbox" id="chat-sound"> <span data-i18n="chatSound"></span></label>
-      <label><span data-i18n="nickname"></span>
-        <input type="text" id="nickname" maxlength="24" autocomplete="off">
-      </label>
-      <p class="muted" data-i18n="ipNotice"></p>
+      <label class="check"><input type="checkbox" id="set-chatSound"> <span data-i18n="chatSound"></span></label>
     </fieldset>
+
+    <fieldset>
+      <legend data-i18n="display"></legend>
+      <label class="check"><input type="checkbox" id="set-showPresets"> <span data-i18n="showPresets"></span></label>
+      <label class="check"><input type="checkbox" id="set-hideTab"> <span data-i18n="hideTab"></span></label>
+      <p class="help" data-i18n="hideTabHelp"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend data-i18n="multiplayer"></legend>
+      <label class="check"><input type="checkbox" id="set-showMulti"> <span data-i18n="showMulti"></span></label>
+      <p class="help" data-i18n="showMultiHelp"></p>
+    </fieldset>
+
     <!-- Sauvegarde des playlists dans un fichier, et restauration -->
     <fieldset>
       <legend data-i18n="backup"></legend>
-      <p class="muted" data-i18n="backupHelp"></p>
+      <p class="help" data-i18n="backupHelp"></p>
       <div class="line">
         <button id="backup-save" data-i18n="backupSave"></button>
         <button id="backup-restore" data-i18n="backupRestore"></button>
         <input type="file" id="backup-file" accept=".json,application/json" hidden>
       </div>
     </fieldset>
+
+    <fieldset>
+      <legend data-i18n="profile"></legend>
+      <label><span data-i18n="nickname"></span>
+        <input type="text" id="set-nickname" maxlength="24" autocomplete="off">
+      </label>
+      <p class="help" data-i18n="nicknameHelp"></p>
+      <p><span data-i18n="codeLabel"></span> : <span id="my-code" class="code"></span></p>
+      <p class="help" data-i18n="codeHelp"></p>
+      <p class="help" data-i18n="ipNotice"></p>
+    </fieldset>
+
     <fieldset>
       <legend data-i18n="bannedList"></legend>
-      <ul id="banned"></ul>
+      <ul id="banned" class="list"></ul>
     </fieldset>
+
     <details>
       <summary data-i18n="log"></summary>
-      <pre id="log"></pre>
+      <pre id="log" class="log"></pre>
     </details>
+
     <fieldset>
       <legend data-i18n="about"></legend>
       <p>Sidetrack <span id="version"></span></p>
@@ -229,7 +258,9 @@
     </fieldset>
   </main>
 
+  <script src="common/i18n-core.js"></script>
   <script src="i18n.js"></script>
+  <script src="common/ui.js"></script>
   <script src="presets.js"></script>
   <script src="sidebar.js"></script>
 </body>

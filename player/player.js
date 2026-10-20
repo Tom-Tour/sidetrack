@@ -22,26 +22,24 @@ let stallRestarts = 0;
 const unlock = document.getElementById("unlock");
 const cover = document.getElementById("cover");
 
-// Textes de la page, dans la langue du navigateur
-const TEXT = navigator.language.toLowerCase().startsWith("fr")
-  ? {
-      title: "Sidetrack est presque prêt",
-      click: "Clique sur « Lancer Sidetrack » : Firefox n'active le son qu'après un clic. L'onglet se range ensuite tout seul.",
-      hide: "Une petite bulle peut s'afficher en haut à droite de Firefox (« Une extension masque certains de vos onglets ») : clique sur « Garder les onglets masqués ». Tu retrouves l'onglet avec 📺 dans le panneau.",
-      unlock: "🔊 Lancer Sidetrack",
-      orphan: "Sidetrack n'est plus actif : tu peux fermer cet onglet.",
-    }
-  : {
-      title: "Sidetrack is almost ready",
-      click: "Click “Launch Sidetrack”: Firefox only turns the sound on after a click. The tab then tucks itself away.",
-      hide: "A small bubble may show up at the top right of Firefox (“An extension is hiding some of your tabs”): click “Keep Tabs Hidden”. You can get the tab back with 📺 in the sidebar.",
-      unlock: "🔊 Launch Sidetrack",
-      orphan: "Sidetrack is no longer active: you can close this tab.",
-    };
-document.getElementById("setup-title").textContent = TEXT.title;
-document.getElementById("step-click").textContent = TEXT.click;
-document.getElementById("step-hide").textContent = TEXT.hide;
-unlock.querySelector("button").textContent = TEXT.unlock;
+// Textes de la page, dans la langue du navigateur (moteur de traduction : ../common/i18n-core.js)
+const STRINGS = {
+  fr: {
+    setupTitle: "Sidetrack est presque prêt",
+    setupClick: "Clique sur « Lancer Sidetrack » : Firefox n'active le son qu'après un clic. L'onglet se range ensuite tout seul.",
+    setupHide: "Une petite bulle peut s'afficher en haut à droite de Firefox (« Une extension masque certains de vos onglets ») : clique sur « Garder les onglets masqués ». Tu retrouves l'onglet avec 📺 dans le panneau.",
+    unlock: "🔊 Lancer Sidetrack",
+    orphan: "Sidetrack n'est plus actif : tu peux fermer cet onglet.",
+  },
+  en: {
+    setupTitle: "Sidetrack is almost ready",
+    setupClick: "Click “Launch Sidetrack”: Firefox only turns the sound on after a click. The tab then tucks itself away.",
+    setupHide: "A small bubble may show up at the top right of Firefox (“An extension is hiding some of your tabs”): click “Keep Tabs Hidden”. You can get the tab back with 📺 in the sidebar.",
+    unlock: "🔊 Launch Sidetrack",
+    orphan: "Sidetrack is no longer active: you can close this tab.",
+  },
+};
+applyI18n();
 
 function send(msg) {
   window.postMessage({ sidetrack: true, ...msg }, location.origin);
@@ -224,7 +222,7 @@ function shutDown() {
   orphaned = true;
   player?.pauseVideo?.();
   window.close();
-  document.body.textContent = TEXT.orphan;
+  document.body.textContent = t("orphan");
   document.body.style.cssText = "color:#fff;display:flex;align-items:center;justify-content:center";
 }
 

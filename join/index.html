@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sidetrack</title>
   <!-- Versions à incrémenter à chaque modification (cache de GitHub Pages) -->
-  <link rel="stylesheet" href="join.css?v=8">
+  <link rel="stylesheet" href="join.css?v=9">
 </head>
 <body>
   <nav id="langs"><button data-lang="fr">FR</button> · <button data-lang="en">EN</button></nav>
@@ -14,12 +14,15 @@
     <h1>Sidetrack</h1>
     <p class="muted" data-i18n="intro"></p>
     <form id="login-form">
-      <label><span data-i18n="codeLabel"></span> <input id="code" type="text" maxlength="24" autocomplete="off" required></label>
-      <label><span data-i18n="nameLabel"></span> <input id="name" type="text" maxlength="24" autocomplete="nickname" required></label>
-      <button type="submit" data-i18n="joinButton"></button>
+      <label><span data-i18n="roomName"></span> <input id="code" type="text" maxlength="24" autocomplete="off" required></label>
+      <label><span data-i18n="nickname"></span> <input id="name" type="text" maxlength="24" autocomplete="nickname" required></label>
+      <button type="submit" data-i18n="join"></button>
       <progress id="pow-progress" max="1" value="0" hidden></progress>
     </form>
     <p id="login-error" class="error" hidden></p>
+    <p class="small"><span data-i18n="codeLabel"></span> : <span class="code my-code"></span></p>
+    <p class="muted small" data-i18n="codeHelp"></p>
+    <p class="muted small" data-i18n="identityMiningHelp"></p>
     <p class="muted small" data-i18n="ipNotice"></p>
   </main>
 
@@ -27,6 +30,7 @@
     <header>
       <strong><span data-i18n="room"></span> <span id="room-code"></span></strong>
       <span id="room-status" class="muted"></span>
+      <span class="muted small" data-i18n-title="codeHelp"><span data-i18n="codeLabel"></span> : <span class="code my-code"></span></span>
       <label class="volume" data-i18n-title="volume">🔊 <input type="range" id="volume" min="0" max="100" value="100"></label>
     </header>
 
@@ -46,7 +50,7 @@
           <button id="claim-found" class="good" data-i18n="found"></button>
           <button id="claim-missed" class="bad" data-i18n="missed"></button>
         </div>
-        <button id="share-moment" data-i18n="shareMoment" data-i18n-title="shareMomentHelp"></button>
+        <button id="share-moment" data-i18n="shareMoment" data-i18n-title="shareMomentTitle"></button>
         <section id="playlist">
           <h2><span data-i18n="hostPlaylist"></span> <span class="muted" data-i18n="hostPlaylistHelp"></span></h2>
           <ol id="queue"></ol>
@@ -58,7 +62,7 @@
         <div id="chat"></div>
         <form id="chat-form">
           <button type="button" id="chat-secret" hidden></button>
-          <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="300">
+          <input id="chat-input" type="text" data-i18n-placeholder="chatPlaceholder" autocomplete="off" maxlength="500">
           <button type="submit" data-i18n="send"></button>
         </form>
         <p id="chat-note" class="muted small" hidden></p>
@@ -68,7 +72,11 @@
 
   <script src="../vendor/peerjs.min.js"></script>
   <script src="../vendor/nostr.bundle.js"></script>
-  <script src="join.js?v=13"></script>
+  <!-- Kit commun (../common/) : versions à incrémenter avec le kit (cache de GitHub Pages) -->
+  <script src="../common/i18n-core.js?v=3"></script>
+  <script src="../common/net.js?v=3"></script>
+  <script src="../common/pow.js?v=3"></script>
+  <script src="join.js?v=14"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

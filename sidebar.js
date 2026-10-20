@@ -1,20 +1,35 @@
 // Télécommande : tout le moteur tourne dans background.js (et le salon dans room.js).
-// On envoie des commandes par le port et on affiche l'état qu'il renvoie.
+// On envoie des commandes par le port et on affiche l'instantané qu'il renvoie.
 
 const $ = (s) => document.querySelector(s);
 
 const port = browser.runtime.connect({ name: "sidebar" });
-let view = null; // { state, game, playerState, notice, log, room, rooms }
+let view = null; // dernier instantané du moteur : { state, settings, game, me, room, guest, rooms… }
 
 function act(cmd, ...args) {
   port.postMessage({ cmd, args });
 }
 
+// Commande dont on attend la réponse : → clé d'erreur, ou null
+let reqSeq = 0;
+const replies = new Map();
+function ask(cmd, ...args) {
+  const req = ++reqSeq;
+  port.postMessage({ cmd, args, req });
+  return new Promise((resolve) => replies.set(req, resolve));
+}
+
 let translated = false;
-port.onMessage.addListener((snap) => {
-  view = snap;
+port.onMessage.addListener((msg) => {
+  if (msg.t === "reply") {
+    replies.get(msg.req)?.(msg.error);
+    replies.delete(msg.req);
+    return;
+  }
+  if (msg.t !== "snap") return;
+  view = msg.snap;
   // Langue : traduction des textes fixes au premier état reçu, puis à chaque changement
-  if (setLang(view.state.lang) || !translated) {
+  if (setLang(view.settings.lang) || !translated) {
     translated = true;
     applyI18n();
   }
@@ -61,6 +76,10 @@ $("#pl-name").addEventListener("keydown", (e) => {
 $("#pl-name").addEventListener("blur", () => editing && stopEditing(true));
 $("#pl-export").addEventListener("click", () => act("exportPlaylist"));
 
+// Suppression d'une playlist : « Sûr ? », second clic dans les 3 s (common/ui.js)
+const sure = createSure(() => render());
+$("#pl-delete").addEventListener("click", () => sure.click("delete", () => act("deletePlaylist")));
+
 // 📚 : les playlists toutes prêtes ; un clic l'ajoute (ou l'affiche si elle est déjà là)
 let presetsOpen = false;
 $("#pl-presets").addEventListener("click", () => {
@@ -69,7 +88,7 @@ $("#pl-presets").addEventListener("click", () => {
 });
 
 function renderPresets() {
-  const shown = view.state.showPresets !== false;
+  const shown = view.settings.showPresets;
   $("#pl-presets").hidden = !shown;
   if (!shown) presetsOpen = false;
   $("#presets").hidden = !presetsOpen;
@@ -77,33 +96,13 @@ function renderPresets() {
   if (!presetsOpen) return;
   $("#preset-list").replaceChildren(
     ...Object.entries(PRESETS).map(([key, preset]) =>
-      button(t("presetCount", preset.name[currentLang()] ?? preset.name.en, preset.items.length), () => {
+      button(t("presetCount", t(preset.name), preset.items.length), () => {
         presetsOpen = false;
         act("addPreset", key);
       })
     )
   );
 }
-
-// Suppression en deux clics (confirm() n'est pas disponible dans la barre latérale)
-let deleteArmed = null;
-$("#pl-delete").addEventListener("click", (e) => {
-  const btn = e.currentTarget;
-  const disarm = () => {
-    clearTimeout(deleteArmed);
-    deleteArmed = null;
-    btn.textContent = "🗑";
-    btn.classList.remove("danger");
-  };
-  if (deleteArmed) {
-    disarm();
-    act("deletePlaylist");
-    return;
-  }
-  btn.textContent = t("sure");
-  btn.classList.add("danger");
-  deleteArmed = setTimeout(disarm, 3000);
-});
 
 $("#add").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -122,12 +121,11 @@ function showSettings(open) {
 
 $("#open-settings").addEventListener("click", () => showSettings(true));
 $("#close-settings").addEventListener("click", () => showSettings(false));
-$("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
-$("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
-$("#chat-sound").addEventListener("change", (e) => act("setSetting", "chatSound", e.target.checked));
-$("#hide-tab").addEventListener("change", (e) => act("setSetting", "hideTab", e.target.checked));
-$("#show-presets").addEventListener("change", (e) => act("setSetting", "showPresets", e.target.checked));
-$("#nickname").addEventListener("change", (e) => act("setSetting", "nickname", e.target.value));
+$("#set-lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.value));
+for (const key of ["chatSound", "showPresets", "hideTab", "showMulti"]) {
+  $(`#set-${key}`).addEventListener("change", (e) => act("setSetting", key, e.target.checked));
+}
+$("#set-nickname").addEventListener("change", (e) => act("setSetting", "nickname", e.target.value));
 
 // Sauvegarde : un fichier JSON avec toutes les playlists, téléchargé depuis le panneau
 $("#backup-save").addEventListener("click", () => {
@@ -170,23 +168,6 @@ let hadRoom = false;
 let lastSeenId = 0;   // dernier message lu (chat déplié)
 let lastHeardId = 0;  // dernier message ayant déclenché le son
 
-// Petit « bip » à l'arrivée d'un message (réglage), sans fichier audio
-let audio = null;
-function beep() {
-  try {
-    audio ??= new AudioContext();
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.08, audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.15);
-    osc.connect(gain).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + 0.15);
-  } catch {
-    // pas de son possible : tant pis
-  }
-}
 $("#toggle-room").addEventListener("click", () => {
   roomOpen = !roomOpen;
   if (roomOpen) act("refreshPublicRooms");
@@ -197,7 +178,7 @@ $("#toggle-room").addEventListener("click", () => {
 function roomName(text) {
   return text
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "-")
@@ -239,12 +220,14 @@ $("#room-copy").addEventListener("click", async (e) => {
   }
   setTimeout(() => (btn.textContent = t("copyLink")), 2000);
 });
-$("#chat-form").addEventListener("submit", (e) => {
+$("#chat-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = $("#chat-input").value.trim();
   if (!text) return;
-  act(view.guest ? "guestChat" : "hostChat", text, secretGuess);
   $("#chat-input").value = "";
+  if (view.guest) return act("guestChat", text, secretGuess);
+  const error = await ask("hostChat", text, secretGuess);
+  if (error) $("#chat-input").value = text; // trop rapide : le texte n'est pas perdu
 });
 
 // --- Contrôles ---------------------------------------------------------------
@@ -270,14 +253,6 @@ $("#clip").addEventListener("change", (e) => act("setBlind", "clip", Number(e.ta
 $("#startMode").addEventListener("change", (e) => act("setBlind", "startMode", e.target.value));
 $("#hideVideo").addEventListener("change", (e) => act("setBlind", "hideVideo", e.target.checked));
 $("#hints").addEventListener("change", (e) => act("setBlind", "hints", e.target.checked));
-
-// Indice façon pendu (joueurs seulement : l'animateur voit le titre)
-function renderHint(hint) {
-  $("#hint").hidden = !hint?.mask;
-  if (!hint?.mask) return;
-  $("#hint-mask").textContent = hint.mask;
-  $("#hint-max").textContent = t("hintMax", hint.max);
-}
 $("#pause").addEventListener("change", (e) => act("setBlind", "pause", Number(e.target.value)));
 $("#scoring").addEventListener("change", (e) => act("setBlind", "scoring", e.target.value));
 $("#judge").addEventListener("change", (e) => act("setBlind", "judge", e.target.value));
@@ -298,7 +273,15 @@ for (const [id, found] of [["#guest-found", true], ["#guest-missed", false]]) {
   });
 }
 
-// --- Affichage -------------------------------------------------------------
+// Indice façon pendu (joueurs seulement : l'animateur voit le titre)
+function renderHint(hint) {
+  $("#hint").hidden = !hint?.mask;
+  if (!hint?.mask) return;
+  $("#hint-mask").textContent = hint.mask;
+  $("#hint-max").textContent = t("hintMax", hint.max);
+}
+
+// --- Éléments d'interface ------------------------------------------------------
 
 function button(label, onClick, cls) {
   const b = document.createElement("button");
@@ -315,6 +298,19 @@ function el(tag, text, cls) {
   return e;
 }
 
+function swatch(color) {
+  const s = el("span", null, "swatch");
+  if (color) s.style.background = color;
+  return s;
+}
+
+function codeTag(code) {
+  return el("span", code || "…", "code");
+}
+
+// « Nom · CODE » : le code distingue deux personnes qui ont le même nom
+const label = (name, code) => (code ? `${name} · ${code}` : name);
+
 function formatTime(s) {
   s = Math.floor(s);
   const h = Math.floor(s / 3600);
@@ -323,14 +319,18 @@ function formatTime(s) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
+// Progression de la preuve de travail : le nombre d'essais est imprévisible (en moyenne
+// 2^bits), la barre avance vite puis ralentit
+const miningShare = (m) => 1 - Math.exp((-2 * m.tries) / m.expected);
+
 function renderNotice() {
   const box = $("#notice");
   box.hidden = !view.notice;
   if (!view.notice) return;
-  box.textContent = t(view.notice.key, ...(view.notice.args ?? []));
-  const row = box.appendChild(el("div"));
-  if (view.notice.focus) row.appendChild(button(t("goToTab"), () => act("focusPlayer")));
-  row.appendChild(button(t("ok"), () => act("dismissNotice")));
+  const actions = el("div", null, "actions");
+  if (view.notice.focus) actions.appendChild(button(t("goToTab"), () => act("focusPlayer")));
+  actions.appendChild(button(t("ok"), () => act("dismissNotice")));
+  box.replaceChildren(t(view.notice.key, ...(view.notice.args ?? [])), actions);
 }
 
 // Texte de chat, pour l'hôte : un lien YouTube s'ajoute à la playlist d'un clic (＋),
@@ -344,11 +344,11 @@ function chatText(parent, text) {
     last = m.index + m[0].length;
     if (m[1]) {
       parent.appendChild(el("span", m[1], "yt"));
-      parent.appendChild(button("＋", () => act("addLink", m[1]), "ref")).title = t("addToPlaylist");
+      parent.appendChild(button("＋", () => act("addLink", m[1]), "ref")).title = t("addToPlaylistTitle");
       continue;
     }
     const seconds = (Number(m[2] ?? 0) * 60 + Number(m[3])) * 60 + Number(m[4]);
-    parent.appendChild(button(m[0], () => act("seek", seconds), "tc")).title = t("seekAll");
+    parent.appendChild(button(m[0], () => act("seek", seconds), "tc")).title = t("seekAllTitle");
   }
   parent.append(text.slice(last));
 }
@@ -374,20 +374,99 @@ function renderPublicRooms() {
   );
 }
 
+// --- Fiche d'un joueur (hôte) ------------------------------------------------
+// Clic sur un nom → fiche : points en blind test, « Exclure… », « Bannir… ». Exclure ou
+// bannir passe toujours par un panneau qui écrit les conséquences (GUIDE.md).
+
+let person = null; // { id, confirm: null | "kick" | "ban" }
+
+function openPerson(id) {
+  person = { id, confirm: null };
+  render();
+}
+
+function closePerson() {
+  person = null;
+  render();
+}
+
+function renderPerson(blind) {
+  const box = $("#person");
+  const room = view.room;
+  const known =
+    person &&
+    room &&
+    (person.id === "host"
+      ? { id: "host", name: t("host"), code: view.me.code, score: room.hostScore }
+      : room.players.find((p) => p.id === person.id));
+  box.hidden = !known;
+  if (!known) {
+    person = null;
+    return;
+  }
+  const close = button("✕", closePerson, "small");
+  close.title = t("close");
+  const head = el("div", null, "head");
+  head.append(swatch(known.color), el("strong", known.name), codeTag(known.code), el("span", null, "grow"), close);
+
+  if (person.confirm) {
+    const kind = person.confirm;
+    const yes = button(t(`${kind}Confirm`, known.name), () => {
+      act(kind, known.id);
+      closePerson();
+    }, "danger");
+    const no = button(t("cancel"), () => {
+      person.confirm = null;
+      render();
+    });
+    const actions = el("div", null, "actions");
+    actions.append(yes, no);
+    box.replaceChildren(
+      head,
+      el("p", t(`${kind}ConfirmTitle`, known.name), "warn"),
+      el("p", t(`${kind}ConfirmHelp`), "muted"),
+      actions
+    );
+    return;
+  }
+  const actions = el("div", null, "actions");
+  if (blind) actions.append(button("+1", () => act("award", known.id, 1)), button("−1", () => act("award", known.id, -1)));
+  if (known.id !== "host") {
+    const ask = (kind) => () => {
+      person.confirm = kind;
+      render();
+    };
+    actions.append(button(t("kickAsk"), ask("kick")), button(t("banAsk"), ask("ban"), "subtle-danger"));
+  }
+  box.replaceChildren(head, actions);
+}
+
+// Pastille d'une personne : couleur, nom, code d'identité, score
+function chip(p, { me = false, onClick = null, score = null } = {}) {
+  const c = el(onClick ? "button" : "span", null, me ? "chip me" : "chip");
+  c.append(swatch(p.color), el("span", p.name), codeTag(p.code));
+  if (score != null) c.append(el("b", String(score)));
+  if (onClick) c.addEventListener("click", onClick);
+  return c;
+}
+
 // Ligne de chat. Hôte : timecodes et vidéos proposées cliquables (pour tout le salon),
-// indice « probable », +1. Invité : propositions masquées pendant une manche.
-function chatLine(msg, { guest, blind, playing }) {
-  if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "system");
+// indice « probable », +1, nom cliquable (fiche). Invité : propositions masquées pendant une manche.
+function chatLine(msg, { guest, referee, playing }) {
+  if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "msg system");
   const who = (m) => (m.from === "host" ? t("host") : m.name);
-  if (msg.masked) return el("p", msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", who(msg)), "masked");
+  if (msg.masked) return el("p", msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", who(msg)), "msg masked");
   // L'hôte joue (onglet Blind test) : pendant la manche, il ne voit que ses propres réponses
   if (playing && msg.private) {
-    return el("p", msg.from === "host" ? t("yourGuess", msg.text ?? "") : t("someoneGuessed", who(msg)), "masked");
+    return el("p", msg.from === "host" ? t("yourGuess", msg.text ?? "") : t("someoneGuessed", who(msg)), "msg masked");
   }
-  const p = el("p", null, msg.private ? "private" : "");
+  const p = el("p", null, msg.private ? "msg private" : "msg");
   if (msg.private) p.append("🔒 ");
-  const name = p.appendChild(el("b", `${who(msg)} : `));
+  const clickable = !guest && msg.from !== "host" && view.room?.players.some((x) => x.id === msg.from);
+  const name = p.appendChild(el("span", `${who(msg)} : `, clickable ? "who" : "who me"));
+  name.title = label(who(msg), msg.code);
   if (msg.color) name.style.color = msg.color;
+  if (clickable) name.addEventListener("click", () => openPerson(msg.from));
   if (msg.text) {
     if (guest) p.append(msg.text);
     else chatText(p, msg.text);
@@ -395,17 +474,17 @@ function chatLine(msg, { guest, blind, playing }) {
   // Aide à l'arbitrage : la proposition ressemble au titre
   if (msg.hint) p.appendChild(el("span", t("probable"), "hint")).title = t("probableTitle");
   if (msg.ref) {
-    const label = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
-    p.append(guest ? el("span", label, "ref plain") : button(label, () => act("playRef", msg.ref), "ref"));
+    const text = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
+    p.append(guest ? el("span", text, "ref plain") : button(text, () => act("playRef", msg.ref), "ref"));
   }
-  // En blind test, l'hôte donne les points directement depuis une proposition
-  if (!guest && blind && msg.from !== "host" && !msg.system) p.append(button("+1", () => act("award", msg.from, 1)));
+  // Animateur : il donne les points directement depuis une proposition
+  if (!guest && referee && msg.from !== "host") p.append(button("+1", () => act("award", msg.from, 1)));
   return p;
 }
 
 function guestStatus(g) {
-  if (g.status === "connecting") return t("guestConnecting");
-  if (g.status === "proof") return t("guestProof");
+  if (g.status === "connecting") return t("connecting");
+  if (g.status === "proof") return view.me.mining ? t("identityMining", Math.round(100 * miningShare(view.me.mining))) : t("connecting");
   if (g.status === "ended") return t(g.endKey, ...(g.endArgs ?? []));
   return t("players", g.players.length);
 }
@@ -420,7 +499,7 @@ function renderRoom(blind) {
   // Après la fermeture, un nouveau nom est proposé (sinon le champ vide montre « Nom du salon »)
   if (!room && hadRoom) $("#room-name").value = suggestName();
   hadRoom = !!room;
-  $("#toggle-room").hidden = !view.state.showMulti && !room;
+  $("#toggle-room").hidden = !view.settings.showMulti && !room;
   $("#toggle-room").classList.toggle("on", roomOpen);
 
   // Messages des autres : badge de non-lus sur 🌐 quand le chat est replié, son en option
@@ -432,17 +511,27 @@ function renderRoom(blind) {
   $("#unread").hidden = !unread;
   $("#unread").textContent = unread > 9 ? "9+" : String(unread);
   if (latest > lastHeardId) {
-    if (lastHeardId && view.state.chatSound) beep();
+    if (lastHeardId && view.settings.chatSound) beep();
     lastHeardId = latest;
   }
   if (!room) lastSeenId = lastHeardId = 0; // un autre salon recommence sa numérotation
 
+  // Premier lancement : identité anti-spam en cours de calcul
+  const mining = view.me.mining;
   $("#online").hidden = !roomOpen;
+  $("#mining").hidden = !mining || !!room;
+  if (mining) {
+    const share = miningShare(mining);
+    $("#mining-text").textContent = t("identityMining", Math.round(100 * share));
+    $("#mining-bar").value = share;
+  }
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
   $("#rooms-row").hidden = !!room;
   $("#public-list").hidden = !!room;
   if (!room) {
+    person = null;
+    $("#person").hidden = true;
     $("#room-go").textContent = listedRoom() ? t("join") : t("create");
     return renderPublicRooms();
   }
@@ -451,58 +540,49 @@ function renderRoom(blind) {
   $("#room-code").textContent = room.code;
   $("#room-public-badge").hidden = !room.public;
   if (!$("#room-copy").textContent.startsWith("✓")) $("#room-copy").textContent = t("copyLink");
-  $("#room-close").title = t(guest ? "leaveRoom" : "closeRoom");
+  $("#room-close").title = t(guest ? "leave" : "closeRoom");
   $("#room-status").textContent = guest
     ? guestStatus(guest)
     : room.status === "opening"
       ? t("roomOpening")
       : room.status === "error"
-        ? t("roomError")
+        ? t("connError")
         : t("guests", room.players.length);
-  // Preuve de travail : nombre d'essais imprévisible, la barre avance vite puis ralentit
-  const proving = guest?.status === "proof";
-  $("#room-progress").hidden = !proving;
-  if (proving) $("#room-progress").value = 1 - Math.exp((-2 * guest.tries) / 2 ** (guest.powBits || 7));
   $("#chat-input").placeholder = t(guest ? "guestChatPlaceholder" : "chatPlaceholder");
   $("#chat-input").disabled = !!guest && guest.status !== "joined";
 
-  // Pastilles des joueurs : couleur, score ; l'hôte peut, au survol, exclure ou bannir
-  const scores = guest ? !!guest.host?.blind : true;
+  // Pastilles : couleur, nom, code, score. L'hôte clique sur un nom pour ouvrir sa fiche.
+  const scores = guest ? !!guest.host?.blind : blind;
   const hostScore = guest ? guest.host?.hostScore : view.state.mode === "blind" ? room.hostScore : null;
-  const hostChip = () => {
-    const li = el("li", null, guest ? "" : "me");
-    li.append(el("span", t("host")), el("b", String(hostScore)));
-    if (!guest) li.append(button("+1", () => act("award", "host", 1)), button("−1", () => act("award", "host", -1)));
-    return li;
-  };
+  const hostChip = () =>
+    chip(
+      { name: t("host"), code: guest ? guest.hostCode : view.me.code },
+      { me: !guest, score: hostScore, onClick: guest ? null : () => openPerson("host") }
+    );
   $("#room-players").replaceChildren(
     ...(hostScore != null ? [hostChip()] : []),
-    ...room.players.map((p) => {
-      const li = el("li", null, p.id === me ? "me" : "");
-      const name = li.appendChild(el("span", p.name));
-      name.style.color = p.color;
-      if (scores) li.append(el("b", String(p.score)));
-      if (guest) return li;
-      if (blind) {
-        li.append(button("+1", () => act("award", p.id, 1)), button("−1", () => act("award", p.id, -1)));
-      }
-      li.appendChild(button("✕", () => act("kick", p.id), "mod")).title = t("kick");
-      li.appendChild(button("🚫", () => act("ban", p.id), "mod")).title = t("ban");
-      return li;
-    })
+    ...room.players.map((p) =>
+      chip(p, { me: p.id === me, score: scores ? p.score : null, onClick: guest ? null : () => openPerson(p.id) })
+    )
   );
+  if (guest) {
+    person = null;
+    $("#person").hidden = true;
+  } else {
+    renderPerson(blind);
+  }
 
   const chat = $("#chat");
   const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
   const playing = !guest && view.state.mode === "blind";
   const referee = !guest && view.state.mode === "emcee";
-  chat.replaceChildren(...room.chat.map((msg) => chatLine(msg, { guest: !!guest, blind: referee, playing })));
+  chat.replaceChildren(...room.chat.map((msg) => chatLine(msg, { guest: !!guest, referee, playing })));
 
   // Bouton 🔒/💬 devant le champ : en blind test, pour les joueurs (pas pour l'animateur)
   const plays = guest ? !!guest.host?.blind : playing;
   $("#chat-secret").hidden = !plays;
   $("#chat-secret").textContent = secretGuess ? "🔒" : "💬";
-  $("#chat-secret").title = t(secretGuess ? "secretOn" : "secretOff");
+  $("#chat-secret").title = t(secretGuess ? "secretOnTitle" : "secretOffTitle");
   $("#chat-secret").classList.toggle("on", secretGuess);
   if (atBottom) chat.scrollTop = chat.scrollHeight;
 }
@@ -577,7 +657,7 @@ function renderGuest(g) {
 // multi : animateur (il arbitre) ; room : dans un salon, qu'on anime ou qu'on joue
 function renderBlind(game, n, multi, room = multi) {
   const status = $("#blind-status");
-  const blind = view.state.blind;
+  const blind = view.settings.blind;
   const self = !multi && blind.judge === "self"; // chacun se juge (Trouvé / Raté)
   const total = game.order.length;
   // Score « x/y » en solo seulement : dans un salon, les points s'affichent sur les pastilles
@@ -618,14 +698,14 @@ function renderBlind(game, n, multi, room = multi) {
 // Animateur : quatre boutons comme en mode Playlist, la liste des pistes en dessous
 function emceeControls(game, n) {
   const live = ["playing", "timeup"].includes(game.phase);
-  const b = (label, title, cmd, enabled) => {
-    const x = button(label, () => act(cmd));
+  const b = (text, title, cmd, enabled) => {
+    const x = button(text, () => act(cmd));
     x.title = t(title);
     x.disabled = !enabled;
     return x;
   };
   return [
-    b("🔀", "newGame", "startGame", n > 0 && game.phase !== "loading"),
+    b("🔀", "newGameTitle", "startGame", n > 0 && game.phase !== "loading"),
     b(view.playerState === 1 ? "⏸" : "▶", "playPause", "playPause", !["idle", "over", "loading"].includes(game.phase)),
     b("👁", "revealTitle", "reveal", live),
     b("⏭", "nextRoundTitle", "nextRound", live || game.phase === "revealed"),
@@ -660,96 +740,89 @@ function playerActions(game, n, room, self) {
   }
 }
 
-// Hôte d'un salon : lecture / pause du morceau de la manche (pour réécouter, faire durer…)
-function playPause() {
-  const b = button(view.playerState === 1 ? "⏸" : "▶", () => act("playPause"), "icon");
-  b.title = t("playPause");
-  return b;
-}
-
 // File de lecture : glisser-déposer pour réordonner, ▸ pour dérouler les chapitres
 const expanded = new Set();      // ids des vidéos dépliées
 const chaptersAsked = new Set(); // ids dont on a demandé les chapitres
 let dragging = false;
 
 // Une liste de pistes. Mode Playlist : glisser-déposer, suppression, clic = lecture.
-// Blind test de l'hôte : clic = prochaine manche, pistes déjà jouées grisées, rien d'éditable.
+// Animateur : clic = prochaine manche, pistes déjà jouées grisées, rien d'éditable.
 function trackList(index, { picking = false, played = new Set() } = {}) {
   return items().map((item, i) => {
-      const li = el("li", null, i === index ? (view.loading ? "current loading" : "current") : played.has(`${i}`) ? "played" : "");
-      li.draggable = !picking;
-      li.addEventListener("dragstart", (e) => {
-        dragging = true;
-        e.dataTransfer.setData("text/plain", String(i));
-        e.dataTransfer.effectAllowed = "move";
-      });
-      li.addEventListener("dragend", () => {
-        dragging = false;
-        render();
-      });
-      li.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        li.classList.add("drop-target");
-      });
-      li.addEventListener("dragleave", () => li.classList.remove("drop-target"));
-      li.addEventListener("drop", (e) => {
-        e.preventDefault();
-        dragging = false;
-        act("moveItem", Number(e.dataTransfer.getData("text/plain")), i);
-      });
-
-      const row = li.appendChild(el("div", null, "row"));
-      const open = expanded.has(item.id);
-      row.appendChild(
-        button(open ? "▾" : "▸", (e) => {
-          e.stopPropagation();
-          if (open) expanded.delete(item.id);
-          else expanded.add(item.id);
-          render();
-        })
-      ).title = t("chapters");
-      const title = row.appendChild(el("span", item.title));
-      title.title = item.title;
-      row.addEventListener("click", () => act(picking ? "blindPick" : "play", i, null));
-      if (!picking) {
-        const del = row.appendChild(
-          button("✕", (e) => {
-            e.stopPropagation();
-            act("removeItem", i);
-          }, "del")
-        );
-        del.title = t("removeItem");
-      }
-
-      if (open) {
-        const list = li.appendChild(el("ul", null, "chapters"));
-        if (!Array.isArray(item.chapters)) {
-          list.appendChild(el("li", t("loadingChapters"), "muted"));
-          if (!chaptersAsked.has(item.id)) {
-            chaptersAsked.add(item.id);
-            act("loadChapters", i);
-          }
-        } else if (!item.chapters.length) {
-          list.appendChild(el("li", t("noChapters"), "muted"));
-        } else {
-          item.chapters.forEach((c, k) => {
-            const cli = list.appendChild(el("li", null, played.has(`${i}:${k}`) ? "played" : ""));
-            const crow = cli.appendChild(el("div", null, "row"));
-            crow.append(el("time", formatTime(c.start)), el("span", c.title));
-            crow.title = c.title;
-            crow.addEventListener("click", () => (picking ? act("blindPick", i, k) : act("playAt", i, c.start)));
-          });
-        }
-      }
-      return li;
+    const li = el("li", null, i === index ? (view.loading ? "current loading" : "current") : played.has(`${i}`) ? "played" : "");
+    li.draggable = !picking;
+    li.addEventListener("dragstart", (e) => {
+      dragging = true;
+      e.dataTransfer.setData("text/plain", String(i));
+      e.dataTransfer.effectAllowed = "move";
     });
+    li.addEventListener("dragend", () => {
+      dragging = false;
+      render();
+    });
+    li.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      li.classList.add("drop-target");
+    });
+    li.addEventListener("dragleave", () => li.classList.remove("drop-target"));
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dragging = false;
+      act("moveItem", Number(e.dataTransfer.getData("text/plain")), i);
+    });
+
+    const row = li.appendChild(el("div", null, "row"));
+    const open = expanded.has(item.id);
+    row.appendChild(
+      button(open ? "▾" : "▸", (e) => {
+        e.stopPropagation();
+        if (open) expanded.delete(item.id);
+        else expanded.add(item.id);
+        render();
+      })
+    ).title = t("chapters");
+    const title = row.appendChild(el("span", item.title));
+    title.title = item.title;
+    row.addEventListener("click", () => act(picking ? "blindPick" : "play", i, null));
+    if (!picking) {
+      const del = row.appendChild(
+        button("✕", (e) => {
+          e.stopPropagation();
+          act("removeItem", i);
+        }, "del")
+      );
+      del.title = t("removeItem");
+    }
+
+    if (open) {
+      const list = li.appendChild(el("ul", null, "chapters"));
+      if (!Array.isArray(item.chapters)) {
+        list.appendChild(el("li", t("loadingChapters"), "muted"));
+        if (!chaptersAsked.has(item.id)) {
+          chaptersAsked.add(item.id);
+          act("loadChapters", i);
+        }
+      } else if (!item.chapters.length) {
+        list.appendChild(el("li", t("noChapters"), "muted"));
+      } else {
+        item.chapters.forEach((c, k) => {
+          const cli = list.appendChild(el("li", null, played.has(`${i}:${k}`) ? "played" : ""));
+          const crow = cli.appendChild(el("div", null, "row"));
+          crow.append(el("time", formatTime(c.start)), el("span", c.title));
+          crow.title = c.title;
+          crow.addEventListener("click", () => (picking ? act("blindPick", i, k) : act("playAt", i, c.start)));
+        });
+      }
+    }
+    return li;
+  });
 }
 
 // Pendant une partie, le moteur renvoie son état chaque seconde : une liste n'est reconstruite
 // que si ce qu'elle affiche a changé (et un clic en cours sur une ligne n'est pas perdu)
 const drawn = new Map();
 function changed(list, ...parts) {
-  const key = JSON.stringify([currentLang(), [...expanded], view.loading, ...parts]);
+  const key = JSON.stringify([document.documentElement.lang, [...expanded], view.loading, ...parts]);
   if (drawn.get(list) === key) return false;
   drawn.set(list, key);
   return true;
@@ -763,7 +836,7 @@ function renderQueue(index) {
   $("#empty").hidden = items().length > 0;
 }
 
-// Blind test avec un salon : l'hôte arbitre, il voit les pistes et choisit la prochaine manche
+// Animateur : il voit les pistes et choisit la prochaine manche
 let hostTracksShown = true;
 $("#host-tracks-toggle").addEventListener("click", () => {
   hostTracksShown = !hostTracksShown;
@@ -780,8 +853,11 @@ function renderHostTracks(game) {
   }
 }
 
+// --- Affichage -------------------------------------------------------------
+
 function render() {
-  const { state, game } = view;
+  if (!view) return;
+  const { state, settings, game } = view;
   const multi = !!view.room;
   // Animateur (hôte d'un salon, onglet 🎤) : il voit tout. Sinon, en blind test, on joue.
   const referee = multi && state.mode === "emcee";
@@ -795,6 +871,9 @@ function render() {
       })
     );
   }
+  const armed = sure.armed("delete");
+  $("#pl-delete").textContent = armed ? t("sure") : "🗑";
+  $("#pl-delete").classList.toggle("danger", armed);
   renderNotice();
   renderPresets();
 
@@ -806,7 +885,7 @@ function render() {
   $("#mode-emcee").classList.toggle("on", referee);
   $("#mode-emcee").hidden = !multi;
   renderRoom(blind);
-  renderSettings(state);
+  renderSettings(settings);
 
   // Invité d'un salon : pas de playlist à soi ni de blind test, on suit l'hôte
   const guest = view.guest;
@@ -815,24 +894,22 @@ function render() {
   $("#guest").hidden = !guest;
   $("#listen").hidden = !!guest || blind;
   $("#blind").hidden = !!guest || !blind;
-  if (document.activeElement !== $("#volume")) $("#volume").value = String(state.volume ?? 100);
+  if (document.activeElement !== $("#volume")) $("#volume").value = String(settings.volume);
   if (guest) return renderGuest(guest);
 
-  // Miniature du morceau (la vidéo est dans l'onglet masqué). En blind test solo, aperçu noir
+  // Miniature du morceau (la vidéo est dans l'onglet masqué). En blind test joué, aperçu noir
   // sauf une fois la réponse révélée (ou pendant la manche si on ne masque pas la vidéo).
   const current = items()[state.index];
   const art = $("#art");
-  const showArt =
-    current && (!blind || referee || game.phase === "revealed" || (secret && !state.blind.hideVideo));
+  const showArt = current && (!blind || referee || game.phase === "revealed" || (secret && !settings.blind.hideVideo));
   art.hidden = !showArt;
   if (showArt) {
     const src = `https://i.ytimg.com/vi/${current.id}/mqdefault.jpg`;
     if (art.src !== src) art.src = src;
   }
   $("#show-player").hidden = blind && !referee;
-  $("#mask").hidden = !(secret && state.blind.hideVideo);
-  $("#mask-time").textContent =
-    game.phase === "timeup" ? t("timeUp") : game.clip ? formatTime(game.remaining) : "";
+  $("#mask").hidden = !(secret && settings.blind.hideVideo);
+  $("#mask-time").textContent = game.phase === "timeup" ? t("timeUp") : game.clip ? formatTime(game.remaining) : "";
   // Une fois révélé (ou pour l'arbitre), en partie par chapitres, la réponse est le titre du chapitre
   const answer =
     blind && (referee || game.phase === "revealed") && game.chapter?.title
@@ -846,15 +923,15 @@ function render() {
   $("#show-player").classList.toggle("on", !!view.playerShown);
   $("#shuffle").classList.toggle("on", state.shuffle);
 
-  $("#clip").querySelector('option[value="-1"]').disabled = state.blind.startMode !== "chapter";
-  if (document.activeElement !== $("#clip")) $("#clip").value = String(state.blind.clip);
-  if (document.activeElement !== $("#startMode")) $("#startMode").value = state.blind.startMode;
-  $("#hideVideo").checked = state.blind.hideVideo;
-  $("#hints").checked = state.blind.hints !== false;
+  $("#clip").querySelector('option[value="-1"]').disabled = settings.blind.startMode !== "chapter";
+  if (document.activeElement !== $("#clip")) $("#clip").value = String(settings.blind.clip);
+  if (document.activeElement !== $("#startMode")) $("#startMode").value = settings.blind.startMode;
+  $("#hideVideo").checked = settings.blind.hideVideo;
+  $("#hints").checked = settings.blind.hints;
   renderHint(secret ? view.hint : null);
-  if (document.activeElement !== $("#pause")) $("#pause").value = String(state.blind.pause ?? 10);
-  if (document.activeElement !== $("#scoring")) $("#scoring").value = state.blind.scoring ?? "auto";
-  if (document.activeElement !== $("#judge")) $("#judge").value = state.blind.judge ?? "chat";
+  if (document.activeElement !== $("#pause")) $("#pause").value = String(settings.blind.pause);
+  if (document.activeElement !== $("#scoring")) $("#scoring").value = settings.blind.scoring;
+  if (document.activeElement !== $("#judge")) $("#judge").value = settings.blind.judge;
   $("#scoring-row").hidden = !referee;
 
   $("#host-tracks").hidden = !referee;
@@ -863,13 +940,14 @@ function render() {
   else renderQueue(state.index);
 }
 
-function renderSettings(state) {
-  $("#lang").value = state.lang ?? "auto";
-  $("#show-multi").checked = state.showMulti !== false;
-  $("#chat-sound").checked = !!state.chatSound;
-  $("#hide-tab").checked = state.hideTab !== false;
-  $("#show-presets").checked = state.showPresets !== false;
-  const banned = Object.entries(state.banned ?? {});
+function renderSettings(settings) {
+  $("#set-lang").value = settings.lang;
+  for (const key of ["chatSound", "showPresets", "hideTab", "showMulti"]) $(`#set-${key}`).checked = settings[key];
+  if (document.activeElement !== $("#set-nickname")) $("#set-nickname").value = settings.nickname;
+  $("#set-nickname").placeholder = t("defaultName");
+  $("#my-code").textContent = view.me.code || "…";
+  // Personnes bannies, au format « Nom · CODE »
+  const banned = Object.entries(settings.banned);
   $("#banned").replaceChildren(
     ...(banned.length
       ? banned.map(([id, name]) => {
@@ -880,7 +958,5 @@ function renderSettings(state) {
         })
       : [el("li", t("noBanned"), "muted")])
   );
-  if (document.activeElement !== $("#nickname")) $("#nickname").value = state.nickname ?? "";
-  $("#nickname").placeholder = t("defaultGuest");
   $("#log").textContent = view.log.join("\n");
 }

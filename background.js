@@ -11,13 +11,18 @@
 const PLAYER_URL = "https://tom-tour.github.io/sidetrack/player/index.html";
 const EXPORT_CHUNK = 50;
 
-// État sauvegardé dans storage.local
-let state = {
-  playlists: [],       // [{ id, name, items: [{ id, title }] }]
-  current: null,       // id de la playlist affichée
-  index: -1,           // morceau en cours dans la playlist
-  shuffle: false,
-  mode: "listen",      // "listen" | "blind" | "emcee" (blind test animé par l'hôte d'un salon)
+// --- Réglages ---------------------------------------------------------------
+// Gardés sous « settings » (GUIDE.md) ; chaque valeur reçue de la barre latérale ou lue dans
+// le stockage passe par cleanSetting / cleanBlind (type, bornes).
+
+const DEFAULTS = {
+  lang: "auto",        // "auto" | "fr" | "en"
+  chatSound: false,    // petit son à chaque nouveau message du salon
+  showMulti: true,     // bouton 🌐 du salon (désactivable pour un usage solo)
+  showPresets: true,   // bouton 📚 des playlists toutes prêtes
+  hideTab: true,       // ranger l'onglet du lecteur hors de la barre d'onglets (tabs.hide)
+  nickname: "",        // pseudo dans les salons
+  volume: 100,
   // startMode : "start" début du morceau | "random" moment aléatoire | "chapter" chapitre aléatoire
   // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
   // pause : secondes de réponse affichée avant la manche suivante (0 = on enchaîne à la main)
@@ -25,14 +30,77 @@ let state = {
   // judge : blind test joué, points « chat » (à l'écrit) ou « self » (chacun se juge)
   // hints : lettres du titre dévoilées peu à peu pendant la manche (le maximum de points baisse)
   blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto", judge: "chat", hints: true },
-  volume: 100,
-  lang: "auto",        // "auto" | "fr" | "en"
-  showMulti: true,     // bouton 🌐 du salon (désactivable dans les réglages pour un usage solo)
-  chatSound: false,    // petit son à chaque nouveau message du salon
-  nickname: "",        // pseudo dans les salons des autres
-  hideTab: true,       // ranger l'onglet du lecteur hors de la barre d'onglets (tabs.hide)
-  showPresets: true,   // bouton 📚 des playlists toutes prêtes
-  banned: {},          // identité (clé publique) → dernier nom connu : refusés dans nos salons
+  banned: {},          // identité (clé publique) → « Nom · CODE » : refusés dans nos salons
+};
+
+let settings = structuredClone(DEFAULTS);
+
+const int = (value, min, max) => (Number.isInteger(value) && value >= min && value <= max ? value : undefined);
+const bool = (value) => (typeof value === "boolean" ? value : undefined);
+
+function cleanSetting(key, value) {
+  switch (key) {
+    case "lang":
+      return ["auto", "fr", "en"].includes(value) ? value : undefined;
+    case "chatSound":
+    case "showMulti":
+    case "showPresets":
+    case "hideTab":
+      return bool(value);
+    case "nickname":
+      return typeof value === "string" ? cleanName(value, "") : undefined;
+    case "volume":
+      return int(value, 0, 100);
+  }
+  return undefined;
+}
+
+function cleanBlind(key, value) {
+  switch (key) {
+    case "clip":
+      return int(value, -1, 3600);
+    case "pause":
+      return int(value, 0, 60);
+    case "startMode":
+      return ["start", "random", "chapter"].includes(value) ? value : undefined;
+    case "scoring":
+      return ["auto", "manual"].includes(value) ? value : undefined;
+    case "judge":
+      return ["chat", "self"].includes(value) ? value : undefined;
+    case "hideVideo":
+    case "hints":
+      return bool(value);
+  }
+  return undefined;
+}
+
+// Réglages lus dans le stockage : tout ce qui est invalide reprend sa valeur par défaut
+function loadSettings(raw = {}) {
+  const out = structuredClone(DEFAULTS);
+  for (const key of Object.keys(DEFAULTS)) {
+    const value = cleanSetting(key, raw[key]);
+    if (value !== undefined) out[key] = value;
+  }
+  for (const key of Object.keys(DEFAULTS.blind)) {
+    const value = cleanBlind(key, raw.blind?.[key]);
+    if (value !== undefined) out.blind[key] = value;
+  }
+  if (raw.banned && typeof raw.banned === "object") {
+    for (const [id, label] of Object.entries(raw.banned)) {
+      if (/^[0-9a-f]{64}$/.test(id) && typeof label === "string") out.banned[id] = cleanText(label, 40);
+    }
+  }
+  return out;
+}
+
+// --- État -------------------------------------------------------------------
+
+let state = {
+  playlists: [],       // [{ id, name, preset?, items: [{ id, title, chapters? }] }]
+  current: null,       // id de la playlist affichée
+  index: -1,           // morceau en cours dans la playlist
+  shuffle: false,
+  mode: "listen",      // "listen" | "blind" | "emcee" (blind test animé par l'hôte d'un salon)
 };
 
 let playerState = -1;  // -1 non démarré, 0 fini, 1 lecture, 2 pause, 5 prête
@@ -48,10 +116,6 @@ function inGame() {
   return state.mode === "blind" || state.mode === "emcee";
 }
 
-function emcee() {
-  return state.mode === "emcee" && !!room;
-}
-
 // Partie de blind test en cours (non sauvegardée)
 let game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0 };
 let gameTimer = null;
@@ -63,7 +127,78 @@ function log(msg) {
 }
 
 function save() {
-  browser.storage.local.set({ sidetrack: state });
+  const { playlists, current, shuffle, mode } = state;
+  browser.storage.local.set({ sidetrack: { playlists, current, shuffle, mode }, settings });
+}
+
+// --- Identité ----------------------------------------------------------------
+// Une clé Nostr gardée en local signe chaque entrée dans un salon (poignée de main de
+// common/net.js). Elle s'accompagne d'une preuve de travail (common/pow.js), calculée une
+// seule fois, qui donne aussi le code d'identité affiché à côté du nom.
+
+const pow = createPow({ app: "sidetrack", worker: "common/pow-worker.js" });
+const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+const unhex = (s) => Uint8Array.from(s.match(/../g).map((h) => parseInt(h, 16)));
+
+let identity = { secret: null, pubkey: "", pow: null, code: "" };
+let mining = null;     // { tries } pendant le calcul
+let identityWaiters = [];
+
+// Résolue quand la preuve de notre identité est prête
+function whenIdentity() {
+  if (identity.pow != null) return Promise.resolve();
+  return new Promise((resolve) => identityWaiters.push(resolve));
+}
+
+function identityReady(nonce, code) {
+  identity.pow = nonce;
+  identity.code = code;
+  mining = null;
+  browser.storage.local.set({ pow: { v: POW.VERSION, pubkey: identity.pubkey, nonce, code } });
+  log(t("logIdentity", code));
+  for (const resolve of identityWaiters) resolve();
+  identityWaiters = [];
+  update();
+}
+
+function mineIdentity() {
+  mining = { tries: 0 };
+  update();
+  let shown = 0;
+  pow
+    .mine(identity.pubkey, POW.BITS, (tries) => {
+      mining.tries = tries;
+      if (tries - shown >= 5) {
+        shown = tries;
+        update();
+      }
+    })
+    .then(({ nonce, code }) => identityReady(nonce, code))
+    .catch(() => {
+      mining = null;
+      update();
+    });
+}
+
+async function initIdentity(stored) {
+  let secret = typeof stored.identity === "string" && /^[0-9a-f]{64}$/.test(stored.identity) ? stored.identity : null;
+  if (!secret) {
+    secret = hex(NostrTools.generateSecretKey());
+    await browser.storage.local.set({ identity: secret });
+  }
+  identity = { secret: unhex(secret), pubkey: NostrTools.getPublicKey(unhex(secret)), pow: null, code: "" };
+  const saved = stored.pow;
+  if (saved?.pubkey !== identity.pubkey || !Number.isSafeInteger(saved.nonce)) return mineIdentity();
+  if (saved.v === POW.VERSION && typeof saved.code === "string") {
+    identity.pow = saved.nonce;
+    identity.code = saved.code;
+    return;
+  }
+  // Preuve d'avant le kit commun ({ pubkey, bits, nonce }) : même calcul, il ne lui manque que
+  // le code, qu'une seule vérification redonne
+  const { bits, code } = await pow.check(identity.pubkey, saved.nonce);
+  if (bits >= POW.BITS) identityReady(saved.nonce, code);
+  else mineIdentity();
 }
 
 // --- Liaison avec la barre latérale ---------------------------------------
@@ -75,7 +210,8 @@ function snapshot() {
   const loading = !!loadingSince && Date.now() - loadingSince < LOADING_MAX;
   const hint = ["playing", "timeup"].includes(game.phase) ? { mask: hintMask(), max: maxPoints() } : null;
   return {
-    state, game, hint, playerState, loading, playerShown, notice, log: logLines,
+    state, settings, game, hint, playerState, loading, playerShown, notice, log: logLines,
+    me: { code: identity.code, mining: mining && { tries: mining.tries, expected: 2 ** POW.BITS } },
     room: roomSnapshot(), guest: guestSnapshot(), rooms: publicRoomsSnapshot(),
   };
 }
@@ -86,31 +222,57 @@ function update() {
   updateScheduled = setTimeout(() => {
     updateScheduled = null;
     const snap = snapshot();
-    for (const port of ports) port.postMessage(snap);
+    for (const port of ports) port.postMessage({ t: "snap", snap });
     roomUpdate();
     syncCover();
-  }, 30);
+  }, 50);
 }
 
 browser.runtime.onConnect.addListener((port) => {
   if (port.name === "player") return connectPlayer(port);
   if (port.name !== "sidebar") return;
   ports.add(port);
+  clearUnread();
   // Panneau ouvert : l'onglet du lecteur doit exister. Il se prépare tout de suite (écran
   // « Lancer Sidetrack » si Firefox exige un clic), avant même la première vidéo
   warmPlayer();
   port.onDisconnect.addListener(() => ports.delete(port));
-  port.onMessage.addListener(async ({ cmd, args = [] }) => {
+  port.onMessage.addListener(async ({ cmd, args = [], req }) => {
+    let error = null;
     // Une erreur dans une commande serait sinon invisible : on la met au journal
     try {
-      await actions[cmd]?.(...args);
+      await ready;
+      const result = await actions[cmd]?.(...(Array.isArray(args) ? args : []));
+      if (typeof result === "string") error = result;
     } catch (e) {
+      error = "logCommandError";
       log(t("logCommandError", cmd, e.message));
       console.error(e);
     }
+    if (req != null) port.postMessage({ t: "reply", req, error });
   });
-  port.postMessage(snapshot());
+  port.postMessage({ t: "snap", snap: snapshot() });
 });
+
+// --- Bouton de la barre d'outils ---------------------------------------------
+// Un clic ouvre ou ferme la barre latérale. Badge : messages du salon arrivés pendant
+// qu'elle était fermée (Sidetrack n'a pas de messages privés).
+
+let unread = 0;
+
+browser.browserAction.onClicked.addListener(() => browser.sidebarAction.toggle());
+
+function noteMessage() {
+  if (ports.size) return;
+  unread++;
+  browser.browserAction.setBadgeBackgroundColor({ color: "#0090ff" });
+  browser.browserAction.setBadgeText({ text: unread > 99 ? "99+" : String(unread) });
+}
+
+function clearUnread() {
+  unread = 0;
+  browser.browserAction.setBadgeText({ text: "" });
+}
 
 // --- Playlists -------------------------------------------------------------
 
@@ -143,7 +305,8 @@ function selectPlaylist(id) {
 function restorePlaylists(data) {
   if (data?.app !== "sidetrack" || !Array.isArray(data.playlists)) {
     notice = { key: "noticeBadBackup" };
-    return update();
+    update();
+    return "noticeBadBackup";
   }
   let lists = 0;
   let tracks = 0;
@@ -187,7 +350,7 @@ function addPreset(key) {
   if (!preset) return;
   let p = state.playlists.find((x) => x.preset === key);
   if (!p) {
-    p = newPlaylist(preset.name[LANG] ?? preset.name.en);
+    p = newPlaylist(t(preset.name));
     p.preset = key;
     p.items = preset.items.map(([id, title]) => ({ id, title }));
     log(t("logPreset", p.name, p.items.length));
@@ -206,7 +369,7 @@ function deletePlaylist() {
 // --- Ajout de liens ----------------------------------------------------------
 
 function parseLink(text) {
-  text = text.trim();
+  text = String(text ?? "").trim();
   if (/^[\w-]{11}$/.test(text)) return { id: text, list: null };
   try {
     const u = new URL(text);
@@ -303,6 +466,7 @@ function addLink(text) {
 // Glisser-déposer dans la file : le morceau en cours reste le même
 function moveItem(from, to) {
   const list = items();
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return;
   if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return;
   const current = list[state.index];
   list.splice(to, 0, list.splice(from, 1)[0]);
@@ -319,6 +483,7 @@ async function loadChapters(i) {
 }
 
 function removeItem(i) {
+  if (!items()[i]) return;
   items().splice(i, 1);
   if (i < state.index) state.index--;
   else if (i === state.index) state.index = -1;
@@ -409,7 +574,7 @@ browser.tabs.onActivated.addListener(({ tabId, previousTabId }) => {
     playerShown = shown;
     update();
   }
-  if (state.hideTab && previousTabId != null && previousTabId === playerTabId) {
+  if (settings.hideTab && previousTabId != null && previousTabId === playerTabId) {
     browser.tabs.hide(playerTabId).catch((e) => log(t("logHideError", e.message)));
   }
 });
@@ -451,7 +616,7 @@ function connectPlayer(port) {
 // Réglage changé : l'onglet du lecteur réapparaît dans la barre, ou s'y range s'il n'est pas affiché
 async function applyHideTab() {
   if (playerTabId == null) return;
-  if (!state.hideTab) return browser.tabs.show(playerTabId).catch(() => {});
+  if (!settings.hideTab) return browser.tabs.show(playerTabId).catch(() => {});
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
   if (active?.id !== playerTabId) browser.tabs.hide(playerTabId).catch((e) => log(t("logHideError", e.message)));
 }
@@ -469,7 +634,7 @@ function warmPlayer() {
 // l'onglet s'affiche (premier chargement, clic sur « Lancer Sidetrack », nouvel essai…)
 function videoHidden() {
   if (inGuestRoom()) return guestHidesVideo();
-  return state.mode === "blind" && state.blind.hideVideo && game.phase !== "revealed";
+  return state.mode === "blind" && settings.blind.hideVideo && game.phase !== "revealed";
 }
 
 function syncCover() {
@@ -489,9 +654,8 @@ async function hidePlayerTab() {
 
 // Affiche l'onglet du lecteur ; s'il est déjà affiché et que toggle est vrai, revient à la navigation
 async function focusPlayer(toggle = false) {
-  // 📺 est inactif en blind test solo ; seul l'écran « Lancer Sidetrack » peut y emmener.
-  // Dans un salon, l'hôte est l'arbitre : il garde l'accès à la vidéo ; un invité la voit
-  // quand l'hôte ne la cache pas.
+  // 📺 est inactif en blind test joué ; seul l'écran « Lancer Sidetrack » peut y emmener.
+  // L'animateur garde l'accès à la vidéo ; un invité la voit quand l'hôte ne la cache pas.
   const hidden = inGuestRoom() ? guestHidesVideo() : state.mode === "blind";
   if (playerTabId == null || !playerPort || (toggle && hidden)) return;
   const [active] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -509,11 +673,11 @@ let retriedVisible = false; // reprise déjà tentée onglet affiché, depuis le
 
 function play(i, opts = {}) {
   // Invité d'un salon : c'est l'hôte qui choisit la musique
-  if (inGuestRoom() || i < 0 || i >= items().length) return;
+  if (inGuestRoom() || !Number.isInteger(i) || i < 0 || i >= items().length) return;
   state.index = i;
   lastPlay = { i, opts };
   log(t("logPlaying", items()[i].title));
-  send({ action: "load", id: items()[i].id, volume: state.volume, ...opts });
+  send({ action: "load", id: items()[i].id, volume: settings.volume, ...opts });
   update();
   save();
 }
@@ -733,7 +897,7 @@ function prepareHints() {
 }
 
 function hintCount() {
-  if (!state.blind.hints || !game.hintOrder.length) return 0;
+  if (!settings.blind.hints || !game.hintOrder.length) return 0;
   const length = game.clip || HINT_SCALE;
   const progress = Math.min(1, Math.max(0, (game.elapsed - 0.25 * length) / (0.65 * length)));
   return Math.floor(game.hintOrder.length * HINT_SHARE * progress);
@@ -746,7 +910,7 @@ function maxPoints() {
 
 // « N _ _ _ _   G _ _ _ _ » : lettres dévoilées, les autres cachées, espaces et signes gardés
 function hintMask() {
-  if (!state.blind.hints || !game.hintText) return null;
+  if (!settings.blind.hints || !game.hintText) return null;
   const shown = new Set(game.hintOrder.slice(0, hintCount()));
   return [...game.hintText].map((c, i) => (!LETTER.test(c) || shown.has(i) ? c : "_")).join("");
 }
@@ -758,7 +922,7 @@ async function startGame() {
   resetGame();
   resetScores(); // nouvelle partie dans un salon : tout le monde repart de zéro (room.js)
   let rounds = items().map((_, i) => ({ i }));
-  if (state.blind.startMode === "chapter") {
+  if (settings.blind.startMode === "chapter") {
     // Une manche par chapitre ; une vidéo sans chapitres reste une seule manche
     game.phase = "loading";
     update();
@@ -803,7 +967,7 @@ function nextRound() {
     return update();
   }
   const { i, chapter } = game.order[game.pos];
-  const { clip, startMode } = state.blind;
+  const { clip, startMode } = settings.blind;
   const chapters = items()[i].chapters;
   game.phase = "playing";
 
@@ -847,7 +1011,7 @@ function timeUp() {
   game.phase = "timeup";
   send({ action: "pause" });
   // Partie automatique : la réponse suit d'elle-même
-  if (state.blind.pause > 0) gameTimer = setTimeout(reveal, TIMEUP_GRACE);
+  if (settings.blind.pause > 0) gameTimer = setTimeout(reveal, TIMEUP_GRACE);
   update();
 }
 
@@ -859,7 +1023,7 @@ function reveal() {
   unmaskGuesses();
   autoScore();
   // Seul, points à l'écrit : la meilleure réponse de la manche, sur 10
-  if (!room && state.blind.judge !== "self") {
+  if (!room && settings.blind.judge !== "self") {
     game.lastPoints = soloPoints();
     game.score += game.lastPoints;
     game.played += 10;
@@ -867,13 +1031,13 @@ function reveal() {
   }
   send({ action: "play" });
   // Partie automatique : la manche suivante part après la pause réglée
-  game.nextIn = state.blind.pause > 0 ? state.blind.pause : 0;
+  game.nextIn = settings.blind.pause > 0 ? settings.blind.pause : 0;
   if (game.nextIn) {
     gameTimer = setInterval(() => {
       game.nextIn--;
       if (game.nextIn > 0) return update();
       // Seul et juge de soi-même, sans réponse donnée : la manche compte comme ratée
-      if (!room && state.blind.judge === "self") answer(false);
+      if (!room && settings.blind.judge === "self") answer(false);
       else nextRound();
     }, 1000);
   }
@@ -890,6 +1054,7 @@ function answer(found) {
 
 // Changer de mode ne coupe pas la musique : seul « Démarrer la partie » lance le blind test.
 function setMode(mode) {
+  if (!["listen", "blind", "emcee"].includes(mode)) return;
   if (state.mode === mode || (mode === "emcee" && !room)) return;
   const wasGame = inGame();
   state.mode = mode;
@@ -904,32 +1069,34 @@ function setMode(mode) {
 
 const actions = {
   selectPlaylist,
-  createPlaylist: (name) => selectPlaylist(newPlaylist(name).id),
+  createPlaylist: (name) => selectPlaylist(newPlaylist(cleanText(name, 80) || t("defaultPlaylist")).id),
   renamePlaylist: (name) => {
-    if (playlist()) playlist().name = name;
+    name = cleanText(name, 80);
+    if (playlist() && name) playlist().name = name;
     update();
     save();
   },
   deletePlaylist,
   addPreset,
   restorePlaylists,
-  logBackup: (count, file) => log(t("logBackup", count, String(file))),
+  logBackup: (count, file) => log(t("logBackup", Number(count) || 0, cleanText(file, 80))),
   addLink,
   removeItem,
   moveItem,
   loadChapters,
   play: (i) => play(i),
-  playAt: (i, start) => play(i, { start }),
-  seek: (time) => send({ action: "seek", time }),
+  playAt: (i, start) => play(i, { start: Math.max(0, Number(start) || 0) }),
+  seek: (time) => send({ action: "seek", time: Math.max(0, Number(time) || 0) }),
   // Clic de l'hôte sur une vidéo, un chapitre ou un moment proposé dans le chat :
   // lance la vidéo à cet instant pour tout le salon
   playRef: (ref) => {
-    const i = items().findIndex((item) => item.id === ref.id);
+    const i = items().findIndex((item) => item.id === ref?.id);
     if (i < 0) return log(t("logNotInPlaylist"));
-    if (i === state.index && playerPort) send({ action: "seek", time: ref.start ?? 0 });
-    else play(i, { start: ref.start ?? 0 });
+    const start = Math.max(0, Number(ref.start) || 0);
+    if (i === state.index && playerPort) send({ action: "seek", time: start });
+    else play(i, { start });
   },
-  // Fonctions de room.js, chargé après ce fichier : on ne les référence qu'à l'appel
+  // Fonctions de room.js et guest.js, chargés après ce fichier : on ne les référence qu'à l'appel
   openRoom: (options) => openRoom(options),
   refreshPublicRooms: () => refreshPublicRooms(),
   closeRoom: () => closeRoom(),
@@ -940,11 +1107,11 @@ const actions = {
   guestClaim: (found) => guestSend({ t: "claim", found: found === true }),
   shareMoment: () => shareMoment(),
   hostChat: (text, secret) => hostChat(text, null, secret),
-  award: (playerId, delta) => award(playerId, delta),
+  award: (playerId, delta) => award(playerId, delta === -1 ? -1 : 1),
   kick: (playerId) => kick(playerId, false),
   ban: (playerId) => kick(playerId, true),
   unban: (playerId) => {
-    delete state.banned[playerId];
+    delete settings.banned[playerId];
     update();
     save();
   },
@@ -968,19 +1135,17 @@ const actions = {
     update();
   },
   // « Trouvé / Raté » : seul, on compte sa manche ; dans un salon, on se donne son point
-  claim: (found) => (room ? claim("host", found) : answer(found)),
+  claim: (found) => (room ? claim("host", found === true) : answer(found === true)),
   nextRound,
   blindPick,
   reveal,
   answer,
   setBlind: (key, value) => {
-    state.blind[key] = value;
+    const clean = cleanBlind(key, value);
+    if (clean === undefined) return;
+    settings.blind[key] = clean;
     // « Durée du chapitre » n'a de sens qu'avec un départ par chapitre
-    if (key === "startMode" && value !== "chapter" && state.blind.clip === -1) state.blind.clip = 20;
-    if (key === "pause") state.blind.pause = Math.max(0, Math.min(60, Number(value) || 0));
-    if (key === "scoring") state.blind.scoring = value === "manual" ? "manual" : "auto";
-    if (key === "judge") state.blind.judge = value === "self" ? "self" : "chat";
-    if (key === "hints") state.blind.hints = value === true;
+    if (key === "startMode" && clean !== "chapter" && settings.blind.clip === -1) settings.blind.clip = 20;
     update();
     save();
   },
@@ -988,16 +1153,20 @@ const actions = {
   focusPlayer: () => focusPlayer(false),
   togglePlayerTab: () => focusPlayer(true),
   setVolume: (value) => {
-    state.volume = value;
-    send({ action: "volume", value });
+    const clean = cleanSetting("volume", value);
+    if (clean === undefined) return;
+    settings.volume = clean;
+    send({ action: "volume", value: clean });
     update();
     save();
   },
   setSetting: (key, value) => {
     if (!["lang", "showMulti", "chatSound", "nickname", "hideTab", "showPresets"].includes(key)) return;
-    state[key] = key === "nickname" ? cleanText(value, 24) : value;
+    const clean = cleanSetting(key, value);
+    if (clean === undefined) return;
+    settings[key] = clean;
     if (key === "hideTab") applyHideTab();
-    if (key === "lang") setLang(value);
+    if (key === "lang") setLang(clean);
     update();
     save();
   },
@@ -1009,17 +1178,23 @@ const actions = {
 
 // --- Démarrage -------------------------------------------------------------
 
-browser.storage.local.get("sidetrack").then((s) => {
-  if (s.sidetrack) {
-    state = { ...state, ...s.sidetrack, blind: { ...state.blind, ...s.sidetrack.blind } };
-    delete state.blindDefaults; // ancienne version de développement
-  }
-  if (!state.banned || typeof state.banned !== "object") state.banned = {};
-  if (state.mode === "emcee") state.mode = "blind"; // pas de salon au démarrage
-  setLang(state.lang);
+async function init() {
+  const stored = await browser.storage.local.get(["sidetrack", "settings", "identity", "pow"]);
+  const data = stored.sidetrack ?? {};
+  // Avant le kit commun, les réglages étaient rangés avec les playlists : on les reprend
+  settings = loadSettings(stored.settings ?? data);
+  if (Array.isArray(data.playlists)) state.playlists = data.playlists;
+  if (typeof data.current === "string") state.current = data.current;
+  state.shuffle = data.shuffle === true;
+  state.mode = data.mode === "blind" ? "blind" : "listen"; // pas de salon au démarrage
+  setLang(settings.lang);
   if (!state.playlists.length) newPlaylist(t("defaultPlaylist"));
   if (!playlist()) state.current = state.playlists[0].id;
   state.index = -1;
-  update();
   save();
-});
+  update();
+  await initIdentity(stored);
+  update();
+}
+
+const ready = init();

@@ -35,16 +35,17 @@
   <!-- Écran de préparation : le clic sur le bouton est ce qui autorise le son pour la session -->
   <div id="unlock" hidden>
     <div class="card">
-      <h1 id="setup-title"></h1>
+      <h1 data-i18n="setupTitle"></h1>
       <ol>
-        <li id="step-click"></li>
-        <li id="step-hide"></li>
+        <li data-i18n="setupClick"></li>
+        <li data-i18n="setupHide"></li>
       </ol>
-      <button></button>
+      <button data-i18n="unlock"></button>
     </div>
   </div>
-  <!-- Version à incrémenter à chaque modification de player.js (cache de GitHub Pages) -->
-  <script src="player.js?v=14"></script>
+  <!-- Versions à incrémenter à chaque modification (cache de GitHub Pages) -->
+  <script src="../common/i18n-core.js?v=3"></script>
+  <script src="player.js?v=15"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

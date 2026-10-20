@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "description": "Sidetrack tests",
+  "scripts": {
+    "test": "node engine.test.cjs && node sidebar.test.cjs && node join.test.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "24.1.3"
+  }
+}

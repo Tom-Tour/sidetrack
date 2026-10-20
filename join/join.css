@@ -1,16 +1,16 @@
 :root {
   --bg: #f9f9fb; --fg: #15141a; --muted: #5b5b66; --card: #fff;
-  --border: #d7d7db; --accent: #0061e0; --active: #e0ecff; --bad: #d70022;
+  --border: #d7d7db; --accent: #0061e0; --active: #e0ecff; --good: #058b00; --bad: #d70022;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #1c1b22; --fg: #fbfbfe; --muted: #a3a3ad; --card: #2b2a33;
-    --border: #45444c; --accent: #00ddff; --active: #1f3a4d; --bad: #ff848b;
+    --border: #45444c; --accent: #00ddff; --active: #1f3a4d; --good: #54ffbd; --bad: #ff848b;
   }
 }
 :root[data-theme="dark"] {
   --bg: #1c1b22; --fg: #fbfbfe; --muted: #a3a3ad; --card: #2b2a33;
-  --border: #45444c; --accent: #00ddff; --active: #1f3a4d; --bad: #ff848b;
+  --border: #45444c; --accent: #00ddff; --active: #1f3a4d; --good: #54ffbd; --bad: #ff848b;
 }
 
 * { box-sizing: border-box; }
@@ -41,8 +41,10 @@ button:hover { border-color: var(--accent); }
 #chat-secret { padding: 0 8px; }
 #claim { display: flex; gap: 6px; margin: 6px 0; }
 #claim button { flex: 1; }
-#claim .good { color: #058b00; border-color: #058b00; }
-#claim .bad { color: #d70022; border-color: #d70022; }
+#claim .good { color: var(--good); border-color: var(--good); }
+#claim .bad { color: var(--bad); border-color: var(--bad); }
+/* Code d'identité (4 caractères) à côté d'un nom, comme dans l'extension */
+.code { font: 12px ui-monospace, monospace; color: var(--muted); letter-spacing: .5px; }
 
 /* Salon */
 #room { padding: 12px 16px; max-width: 1200px; margin: 0 auto; }

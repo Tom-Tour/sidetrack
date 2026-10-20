@@ -4,7 +4,22 @@
   "version": "1.0.0",
   "description": "YouTube playlists in the sidebar while you browse, blind test (solo or with friends), rooms to listen together.",
   "browser_specific_settings": {
-    "gecko": { "id": "sidetrack@tom-tour", "strict_min_version": "115.0" }
+    "gecko": {
+      "id": "sidetrack@tom-tour",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "personalCommunications"
+        ]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  },
+  "icons": {
+    "48": "icons/sidetrack.svg",
+    "96": "icons/sidetrack.svg"
   },
   "permissions": [
     "storage",
@@ -12,24 +27,46 @@
     "https://www.youtube.com/*",
     "https://tom-tour.github.io/*"
   ],
-  "background": { "scripts": ["vendor/peerjs.min.js", "vendor/nostr.bundle.js", "i18n.js", "presets.js", "background.js", "room.js", "guest.js"] },
+  "background": {
+    "scripts": [
+      "vendor/peerjs.min.js",
+      "vendor/nostr.bundle.js",
+      "common/i18n-core.js",
+      "i18n.js",
+      "common/net.js",
+      "common/pow.js",
+      "presets.js",
+      "background.js",
+      "room.js",
+      "guest.js"
+    ]
+  },
   "content_scripts": [
     {
-      "matches": ["https://tom-tour.github.io/sidetrack/player/*"],
-      "js": ["player-bridge.js"],
+      "matches": [
+        "https://tom-tour.github.io/sidetrack/player/*"
+      ],
+      "js": [
+        "player-bridge.js"
+      ],
       "run_at": "document_start"
     }
   ],
-  "icons": { "48": "icons/sidetrack.svg", "96": "icons/sidetrack.svg" },
+  "browser_action": {
+    "default_title": "Sidetrack",
+    "default_icon": "icons/sidetrack.svg"
+  },
   "sidebar_action": {
     "default_title": "Sidetrack",
-    "default_icon": "icons/sidetrack.svg",
     "default_panel": "sidebar.html",
+    "default_icon": "icons/sidetrack.svg",
     "open_at_install": true
   },
   "commands": {
     "_execute_sidebar_action": {
-      "suggested_key": { "default": "Alt+Shift+Y" }
+      "suggested_key": {
+        "default": "Alt+Shift+Y"
+      }
     }
   }
 }

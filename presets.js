@@ -7,7 +7,7 @@
 // bonne réponse (le jeu découpe sur « · »).
 const PRESETS = {
   games: {
-    name: { fr: "🎮 Musiques de jeux vidéo", en: "🎮 Video game music" },
+    name: "presetGames", // clé de traduction (i18n.js)
     items: [
       ["IYMTzLxGv3M", "One-Winged Angel · Nobuo Uematsu · Final Fantasy VII"],
       ["QQq0zv_JXEk", "To Zanarkand · Nobuo Uematsu · Final Fantasy X"],
@@ -29,7 +29,7 @@ const PRESETS = {
     ],
   },
   epic: {
-    name: { fr: "⚔️ Épique : dark fantasy, espace et PS2", en: "⚔️ Epic: dark fantasy, space and PS2" },
+    name: "presetEpic", // clé de traduction (i18n.js)
     items: [
       ["lHZBBE4a02s", "TOMORROW · BiSH · Kingdom"],
       ["WbW8Z6TFW7o", "Ikite, Sansan · Ikimono-gakari · Kingdom"],
@@ -60,7 +60,7 @@ const PRESETS = {
   // Les mixes de dedeco (DJ de musique de jeux vidéo) ont un chapitre par morceau, nommé avec
   // le jeu et le compositeur : en blind test par chapitres, chaque morceau devient une manche.
   dedeco: {
-    name: { fr: "🎧 Spécial dedeco (mixes de musique de jeux vidéo)", en: "🎧 dedeco special (video game music mixes)" },
+    name: "presetDedeco", // clé de traduction (i18n.js)
     items: [
       ["2DOFYQlkFzE", "The PlayStation 1 Drum & Bass DJ Mix · dedeco"],
       ["Fp07SxPU6q8", "PlayStation 2 Drum & Bass DJ Mix · dedeco"],
@@ -79,7 +79,7 @@ const PRESETS = {
     ],
   },
   anime: {
-    name: { fr: "🌸 Génériques d'animes", en: "🌸 Anime openings" },
+    name: "presetAnime", // clé de traduction (i18n.js)
     items: [
       ["x1FV6IrjZCY", "Gurenge · LiSA · Demon Slayer"],
       ["M2cckDmNLMI", "KICK BACK · Kenshi Yonezu · Chainsaw Man"],
