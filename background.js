@@ -25,7 +25,6 @@ let state = {
   // judge : blind test joué, points « chat » (à l'écrit) ou « self » (chacun se juge)
   // hints : lettres du titre dévoilées peu à peu pendant la manche (le maximum de points baisse)
   blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto", judge: "chat", hints: true },
-  blindDefaults: 2,    // version des réglages par défaut du blind test (voir le démarrage)
   volume: 100,
   lang: "auto",        // "auto" | "fr" | "en"
   showMulti: true,     // bouton 🌐 du salon (désactivable dans les réglages pour un usage solo)
@@ -1012,19 +1011,8 @@ const actions = {
 
 browser.storage.local.get("sidetrack").then((s) => {
   if (s.sidetrack) {
-    const blind = { ...state.blind, ...s.sidetrack.blind };
-    // Ancien réglage : case « départ aléatoire »
-    if ("randomStart" in blind) {
-      blind.startMode = blind.randomStart ? "random" : "start";
-      delete blind.randomStart;
-    }
-    state = { ...state, ...s.sidetrack, blind };
-    // Réglages par défaut du blind test passés aux chapitres (départ et durée), une fois
-    if ((s.sidetrack.blindDefaults ?? 1) < 2) {
-      state.blind.startMode = "chapter";
-      state.blind.clip = -1;
-      state.blindDefaults = 2;
-    }
+    state = { ...state, ...s.sidetrack, blind: { ...state.blind, ...s.sidetrack.blind } };
+    delete state.blindDefaults; // ancienne version de développement
   }
   if (!state.banned || typeof state.banned !== "object") state.banned = {};
   if (state.mode === "emcee") state.mode = "blind"; // pas de salon au démarrage

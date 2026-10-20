@@ -541,6 +541,7 @@ function renderGuest(g) {
   $("#guest-listen").hidden = !h?.playlist;
   if (!h?.playlist) return;
   $("#share-moment").disabled = !g.videoId;
+  if (!changed("guest", h.index, itemsKey(h.playlist))) return;
   $("#guest-queue").replaceChildren(
     ...h.playlist.map((item, i) => {
       const li = el("li", null, i === h.index ? "current" : "");
@@ -744,8 +745,20 @@ function trackList(index, { picking = false, played = new Set() } = {}) {
     });
 }
 
+// Pendant une partie, le moteur renvoie son état chaque seconde : une liste n'est reconstruite
+// que si ce qu'elle affiche a changé (et un clic en cours sur une ligne n'est pas perdu)
+const drawn = new Map();
+function changed(list, ...parts) {
+  const key = JSON.stringify([currentLang(), [...expanded], view.loading, ...parts]);
+  if (drawn.get(list) === key) return false;
+  drawn.set(list, key);
+  return true;
+}
+const itemsKey = (list) => list.map((it) => `${it.id}|${it.title}|${Array.isArray(it.chapters) ? it.chapters.length : "-"}`);
+
 function renderQueue(index) {
   if (dragging) return; // reconstruire la liste annulerait le glisser-déposer en cours
+  if (!changed("queue", view.state.current, index, itemsKey(items()))) return;
   $("#queue").replaceChildren(...trackList(index));
   $("#empty").hidden = items().length > 0;
 }
@@ -762,7 +775,9 @@ function renderHostTracks(game) {
   $("#host-tracks-title").textContent = t("tracksTitle", items().length);
   $("#host-tracks-toggle").textContent = hostTracksShown ? t("hide") : t("show");
   $("#host-queue").hidden = !hostTracksShown;
-  if (hostTracksShown) $("#host-queue").replaceChildren(...trackList(view.state.index, { picking: true, played }));
+  if (hostTracksShown && changed("host", view.state.current, view.state.index, [...played], itemsKey(items()))) {
+    $("#host-queue").replaceChildren(...trackList(view.state.index, { picking: true, played }));
+  }
 }
 
 function render() {

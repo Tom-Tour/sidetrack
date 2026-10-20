@@ -1,10 +1,10 @@
 {
   "manifest_version": 2,
   "name": "Sidetrack",
-  "version": "0.1.0",
-  "description": "Local playlists of YouTube videos, playing in the sidebar while you browse.",
+  "version": "1.0.0",
+  "description": "YouTube playlists in the sidebar while you browse, blind test (solo or with friends), rooms to listen together.",
   "browser_specific_settings": {
-    "gecko": { "id": "sidetrack@tom-tour" }
+    "gecko": { "id": "sidetrack@tom-tour", "strict_min_version": "115.0" }
   },
   "permissions": [
     "storage",
@@ -20,8 +20,10 @@
       "run_at": "document_start"
     }
   ],
+  "icons": { "48": "icons/sidetrack.svg", "96": "icons/sidetrack.svg" },
   "sidebar_action": {
     "default_title": "Sidetrack",
+    "default_icon": "icons/sidetrack.svg",
     "default_panel": "sidebar.html",
     "open_at_install": true
   },
