@@ -90,7 +90,6 @@ li.loading > .row::after {
 .chat .ref { color: var(--accent); border-color: var(--accent); } /* référence à un moment, à une vidéo */
 .chat .ref.plain { cursor: default; }
 .chat .yt { color: var(--accent); }
-.chat .msg button { padding: 0 5px; }
 
 /* --- Blind test --- */
 #blind-status { margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
