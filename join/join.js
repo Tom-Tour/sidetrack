@@ -52,6 +52,7 @@ const STRINGS = {
     chatBanned: "{0} a été banni",
     chatNobody: "Personne n'a trouvé cette fois",
     nextIn: "suite dans {0} s",
+    hintMax: "max {0} pts",
     preparing: "Préparation de ton identité anti-spam (une seule fois)…",
     full: "Ce salon est complet (24 joueurs).",
     kicked: "L'hôte t'a exclu du salon.",
@@ -108,6 +109,7 @@ const STRINGS = {
     chatBanned: "{0} was banned",
     chatNobody: "Nobody got it this time",
     nextIn: "next in {0} s",
+    hintMax: "max {0} pts",
     preparing: "Preparing your anti-spam identity (only once)…",
     full: "This room is full (24 players).",
     kicked: "The host kicked you from the room.",
@@ -641,6 +643,7 @@ function render() {
 
   if (!blind) {
     $("#mask").hidden = true;
+    $("#hint").hidden = true;
     $("#now").textContent = room.title ?? t("waiting");
     renderQueue();
     return;
@@ -659,6 +662,12 @@ function render() {
     over: t("blindOver"),
   }[blind.phase];
   $("#blind-status").textContent = blind.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
+  // Indice façon pendu : le titre se dévoile peu à peu, le maximum de points baisse
+  $("#hint").hidden = !blind.hint;
+  if (blind.hint) {
+    $("#hint-mask").textContent = blind.hint;
+    $("#hint-max").textContent = t("hintMax", blind.maxPts);
+  }
   // Chacun se juge : une réponse par manche, après la révélation
   $("#claim").hidden = !(blind.claim && blind.phase === "revealed");
   $("#claim-found").disabled = $("#claim-missed").disabled = claimedRound === blind.round;

@@ -63,6 +63,8 @@ header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin:
 #mask-icon { font-size: 72px; font-weight: 700; }
 #mask-time { font-size: 28px; font-variant-numeric: tabular-nums; }
 #now { margin: 8px 0; font-weight: 600; font-size: 17px; }
+#hint { margin: -4px 0 8px; overflow-wrap: anywhere; }
+#hint-mask { font-family: ui-monospace, monospace; letter-spacing: 3px; font-weight: 600; font-size: 17px; }
 #blind-status { margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
 #share-moment { margin-bottom: 8px; }
 

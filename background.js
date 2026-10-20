@@ -23,7 +23,8 @@ let state = {
   // pause : secondes de réponse affichée avant la manche suivante (0 = on enchaîne à la main)
   // scoring : points de l'animateur, "auto" (comme les joueurs) ou "manual" (il les donne)
   // judge : blind test joué, points « chat » (à l'écrit) ou « self » (chacun se juge)
-  blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto", judge: "chat" },
+  // hints : lettres du titre dévoilées peu à peu pendant la manche (le maximum de points baisse)
+  blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto", judge: "chat", hints: true },
   blindDefaults: 2,    // version des réglages par défaut du blind test (voir le démarrage)
   volume: 100,
   lang: "auto",        // "auto" | "fr" | "en"
@@ -72,8 +73,9 @@ let updateScheduled = null;
 
 function snapshot() {
   const loading = !!loadingSince && Date.now() - loadingSince < LOADING_MAX;
+  const hint = ["playing", "timeup"].includes(game.phase) ? { mask: hintMask(), max: maxPoints() } : null;
   return {
-    state, game, playerState, loading, playerShown, notice, log: logLines,
+    state, game, hint, playerState, loading, playerShown, notice, log: logLines,
     room: roomSnapshot(), guest: guestSnapshot(), rooms: publicRoomsSnapshot(),
   };
 }
@@ -132,6 +134,22 @@ function selectPlaylist(id) {
   state.index = -1;
   resetGame();
   send({ action: "pause" });
+  update();
+  save();
+}
+
+// Playlist toute prête (presets.js) : ajoutée une fois, puis simplement affichée
+function addPreset(key) {
+  const preset = PRESETS[key];
+  if (!preset) return;
+  let p = state.playlists.find((x) => x.preset === key);
+  if (!p) {
+    p = newPlaylist(preset.name[LANG] ?? preset.name.en);
+    p.preset = key;
+    p.items = preset.items.map(([id, title]) => ({ id, title }));
+    log(t("logPreset", p.name, p.items.length));
+  }
+  selectPlaylist(p.id);
   update();
   save();
 }
@@ -643,7 +661,51 @@ function shuffle(a) {
 // (0 = morceau entier, null = inconnue tant que la vidéo n'a pas démarré)
 function resetGame() {
   clearInterval(gameTimer);
-  game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0, clip: 0, chapter: null, nextIn: 0, guesses: [], lastPoints: 0 };
+  game = {
+    phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0, clip: 0, chapter: null, nextIn: 0,
+    guesses: [], lastPoints: 0, elapsed: 0, hintText: "", hintOrder: [],
+  };
+}
+
+// --- Indices, façon pendu ---------------------------------------------------
+// Les lettres du titre se dévoilent peu à peu : rien au premier quart de la manche, puis
+// jusqu'à la moitié des lettres à 90 % du temps. Chaque lettre dévoilée baisse les points
+// qu'une réponse, même parfaite, peut rapporter : 10 au départ, 5 quand la moitié est dévoilée.
+const HINT_SHARE = 0.5;
+const HINT_SCALE = 30; // durée de référence d'une manche sans fin connue (morceau entier)
+const LETTER = /[\p{L}\p{N}]/u;
+
+// Le texte à deviner, tel qu'affiché : sans les parenthèses (« Official Video »…)
+function hintSource() {
+  const item = items()[state.index];
+  const text = game.chapter?.title || item?.title || "";
+  return text.replace(/\([^)]*\)|\[[^\]]*\]|【[^】]*】/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function prepareHints() {
+  game.hintText = hintSource();
+  const letters = [...game.hintText].map((c, i) => (LETTER.test(c) ? i : -1)).filter((i) => i >= 0);
+  game.hintOrder = shuffle(letters);
+  game.elapsed = 0;
+}
+
+function hintCount() {
+  if (!state.blind.hints || !game.hintOrder.length) return 0;
+  const length = game.clip || HINT_SCALE;
+  const progress = Math.min(1, Math.max(0, (game.elapsed - 0.25 * length) / (0.65 * length)));
+  return Math.floor(game.hintOrder.length * HINT_SHARE * progress);
+}
+
+function maxPoints() {
+  if (!game.hintOrder.length) return 10;
+  return Math.max(1, Math.round(10 * (1 - hintCount() / game.hintOrder.length)));
+}
+
+// « N _ _ _ _   G _ _ _ _ » : lettres dévoilées, les autres cachées, espaces et signes gardés
+function hintMask() {
+  if (!state.blind.hints || !game.hintText) return null;
+  const shown = new Set(game.hintOrder.slice(0, hintCount()));
+  return [...game.hintText].map((c, i) => (!LETTER.test(c) || shown.has(i) ? c : "_")).join("");
 }
 
 // Temps écoulé : quelques secondes pour les réponses de dernière seconde, puis la réponse
@@ -718,17 +780,21 @@ function nextRound() {
     play(i, { randomStart: startMode !== "start", clip: game.clip });
   }
   game.remaining = game.clip ?? 0;
+  prepareHints();
 }
 
 function startCountdown() {
   clearInterval(gameTimer);
-  if (game.clip) {
-    gameTimer = setInterval(() => {
+  game.elapsed = 0;
+  // Chaque seconde : le temps qui reste (si l'extrait a une durée) et les indices qui avancent
+  gameTimer = setInterval(() => {
+    game.elapsed++;
+    if (game.clip) {
       game.remaining--;
-      if (game.remaining <= 0) timeUp();
-      else update();
-    }, 1000);
-  }
+      if (game.remaining <= 0) return timeUp();
+    }
+    update();
+  }, 1000);
   update();
 }
 
@@ -802,6 +868,7 @@ const actions = {
     save();
   },
   deletePlaylist,
+  addPreset,
   addLink,
   removeItem,
   moveItem,
@@ -848,11 +915,11 @@ const actions = {
   },
   setMode,
   startGame,
-  // Blind test solo, points à l'écrit : nos réponses de la manche (3 au plus)
+  // Blind test solo, points à l'écrit : nos réponses de la manche, la meilleure compte
   soloGuess: (text) => {
     text = cleanText(text, 120);
-    if (!text || room || !["playing", "timeup"].includes(game.phase) || game.guesses.length >= GUESSES_PER_ROUND) return;
-    game.guesses.push(text);
+    if (!text || room || !["playing", "timeup"].includes(game.phase) || game.guesses.length >= 30) return;
+    game.guesses.push({ text, max: maxPoints() });
     update();
   },
   // « Trouvé / Raté » : seul, on compte sa manche ; dans un salon, on se donne son point
@@ -868,6 +935,7 @@ const actions = {
     if (key === "pause") state.blind.pause = Math.max(0, Math.min(60, Number(value) || 0));
     if (key === "scoring") state.blind.scoring = value === "manual" ? "manual" : "auto";
     if (key === "judge") state.blind.judge = value === "self" ? "self" : "chat";
+    if (key === "hints") state.blind.hints = value === true;
     update();
     save();
   },

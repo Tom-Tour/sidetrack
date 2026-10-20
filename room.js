@@ -464,7 +464,8 @@ function looksRight(guess, parts) {
 // Points d'une proposition, de 0 à 10. 10 si elle est reconnue comme juste (mêmes règles que
 // « probable »), sinon des points partiels dès 4 lettres consécutives en commun avec un morceau
 // du titre (« never gonna » → 5 sur « Never Gonna Give You Up »), ou des mots du titre retrouvés.
-const GUESSES_PER_ROUND = 3; // seules les 3 premières réponses comptent : pas de pêche au hasard
+// Seule la meilleure réponse de chaque joueur compte, et chaque indice dévoilé baisse le maximum
+// possible au moment où l'on répond (voir hints dans background.js).
 
 function commonRun(a, b) {
   let best = 0;
@@ -504,11 +505,16 @@ function roundParts() {
   return item ? answerParts(game.chapter?.title, game.chapter ? null : item.title) : null;
 }
 
+// Points d'une réponse donnée alors que le maximum était `max` (indices déjà dévoilés)
+function cappedPoints(text, max, parts) {
+  return Math.round((guessPoints(text, parts) * (max ?? 10)) / 10);
+}
+
 // Blind test solo, points à l'écrit : la meilleure de nos réponses de la manche
 function soloPoints() {
   const parts = roundParts();
   if (!parts) return 0;
-  return Math.max(0, ...game.guesses.slice(0, GUESSES_PER_ROUND).map((g) => guessPoints(g, parts)));
+  return Math.max(0, ...game.guesses.map((g) => cappedPoints(g.text, g.max, parts)));
 }
 
 function guessHint(text) {
@@ -538,6 +544,7 @@ function addChat({ secret = true, ...entry }) {
     private: player && secret && guessing(),
     // Réponse cachée de cette manche (points à l'écrit) ; un message en clair n'est que du chat
     round: player && secret && guessing() ? game.pos : null,
+    max: player && secret && guessing() ? maxPoints() : null, // plafond selon les indices déjà dévoilés
     hint: fromGuest && guessHint(entry.text), // jamais envoyé aux invités
   };
   room.chat.push(msg);
@@ -603,14 +610,12 @@ function autoScore() {
   if (state.mode === "emcee" ? state.blind.scoring === "manual" : state.blind.judge === "self") return;
   const parts = roundParts();
   if (!parts) return;
-  const tries = new Map();
+  // La meilleure réponse de chaque joueur, chacune plafonnée selon les indices du moment
   const best = new Map();
   for (const msg of room.chat) {
     if (msg.round !== game.pos || !msg.text) continue;
     if (state.mode === "emcee" && msg.from === "host") continue; // l'animateur ne joue pas
-    const n = (tries.get(msg.from) ?? 0) + 1;
-    tries.set(msg.from, n);
-    if (n <= GUESSES_PER_ROUND) best.set(msg.from, Math.max(best.get(msg.from) ?? 0, guessPoints(msg.text, parts)));
+    best.set(msg.from, Math.max(best.get(msg.from) ?? 0, cappedPoints(msg.text, msg.max, parts)));
   }
   const scored = [...best].filter(([, pts]) => pts > 0).sort((a, b) => b[1] - a[1]);
   if (!scored.length) return systemMessage("chatNobody");
@@ -662,6 +667,8 @@ function publicState() {
           answer: game.phase === "revealed" ? currentAnswer() : null,
           nextIn: game.phase === "revealed" ? game.nextIn : 0,
           claim: state.mode === "blind" && state.blind.judge === "self", // chacun se juge
+          hint: ["playing", "timeup"].includes(game.phase) ? hintMask() : null,
+          maxPts: maxPoints(),
         },
     // L'hôte joue lui aussi : son score s'affiche avec ceux des invités
     hostScore: state.mode === "blind" ? room.hostScore ?? 0 : null,

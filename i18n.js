@@ -11,6 +11,10 @@ const STRINGS = {
     deletePlaylist: "Supprimer la playlist",
     sure: "Sûr ?",
     exportYoutube: "Exporter vers YouTube",
+    presets: "Playlists toutes prêtes",
+    presetsHelp: "Uniquement des vidéos officielles (artistes, compositeurs, labels, éditeurs) : les écouter rémunère ceux qui les ont faites.",
+    presetCount: "{0} ({1} morceaux)",
+    logPreset: "Playlist « {0} » ajoutée ({1} morceaux)",
     playlistName: "Nom de la playlist",
     linkPlaceholder: "Lien YouTube : vidéo ou playlist publique",
     linkHelp: "Les playlists privées sont illisibles : passe-les en « Non répertoriée » sur YouTube.",
@@ -95,12 +99,14 @@ const STRINGS = {
     scoring: "Points",
     scoringAuto: "Automatiques (réponse proche du titre)",
     scoringManual: "Je les donne moi-même",
-    autoPoints: "points selon la proximité avec le titre (3 réponses cachées par manche)",
+    autoPoints: "points selon la proximité avec le titre (meilleure réponse cachée)",
     selfPoints: "chacun dit s'il a trouvé",
     judge: "Points",
     judgeChat: "À l'écrit : réponse proche du titre",
     judgeSelf: "Chacun se juge (Trouvé / Raté)",
-    guessPlaceholder: "Ta réponse (3 essais par manche)",
+    guessPlaceholder: "Ta réponse (la meilleure compte)",
+    hints: "Indices : lettres du titre dévoilées peu à peu",
+    hintMax: "max {0} pts",
     soloPoints: "+{0} pts sur 10",
     newGame: "Nouvelle partie (ordre aléatoire)",
     revealTitle: "Révéler la réponse",
@@ -239,6 +245,10 @@ const STRINGS = {
     deletePlaylist: "Delete playlist",
     sure: "Sure?",
     exportYoutube: "Export to YouTube",
+    presets: "Ready-made playlists",
+    presetsHelp: "Official videos only (artists, composers, labels, publishers): listening pays the people who made them.",
+    presetCount: "{0} ({1} tracks)",
+    logPreset: "Playlist “{0}” added ({1} tracks)",
     playlistName: "Playlist name",
     linkPlaceholder: "YouTube link: video or public playlist",
     linkHelp: "Private playlists can't be read: make them “Unlisted” on YouTube.",
@@ -323,12 +333,14 @@ const STRINGS = {
     scoring: "Points",
     scoringAuto: "Automatic (guess close to the title)",
     scoringManual: "I give them myself",
-    autoPoints: "points by closeness to the title (3 hidden guesses per round)",
+    autoPoints: "points by closeness to the title (best hidden guess)",
     selfPoints: "everyone says whether they got it",
     judge: "Points",
     judgeChat: "Written: guess close to the title",
     judgeSelf: "Everyone judges themselves (Got it / Missed)",
-    guessPlaceholder: "Your answer (3 tries per round)",
+    guessPlaceholder: "Your answer (the best one counts)",
+    hints: "Hints: letters of the title revealed little by little",
+    hintMax: "max {0} pts",
     soloPoints: "+{0} pts out of 10",
     newGame: "New game (random order)",
     revealTitle: "Reveal the answer",
@@ -464,6 +476,10 @@ function setLang(pref) {
   const changed = lang !== LANG;
   LANG = lang;
   return changed;
+}
+
+function currentLang() {
+  return LANG;
 }
 
 function t(key, ...args) {

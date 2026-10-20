@@ -13,10 +13,17 @@
       <button id="pl-rename" class="icon" data-i18n-title="rename">✎</button>
       <button id="pl-delete" class="icon" data-i18n-title="deletePlaylist">🗑</button>
       <button id="pl-export" class="icon" data-i18n-title="exportYoutube">⤴</button>
+      <button id="pl-presets" class="icon" data-i18n-title="presets">📚</button>
       <button id="toggle-room" class="icon" data-i18n-title="room">🌐<span id="unread" hidden></span></button>
       <button id="open-settings" class="icon" data-i18n-title="settings">⚙</button>
     </div>
     <p id="notice" hidden></p>
+
+    <!-- Playlists toutes prêtes (bouton 📚) -->
+    <div id="presets" hidden>
+      <p class="muted" data-i18n="presetsHelp"></p>
+      <div id="preset-list"></div>
+    </div>
 
     <form id="add">
       <input id="url" type="text" data-i18n-placeholder="linkPlaceholder" data-i18n-title="linkHelp" autocomplete="off">
@@ -70,6 +77,8 @@
       <div id="loading" hidden data-i18n-title="loadingVideo"><div class="spinner"></div></div>
     </div>
     <div id="now"></div>
+    <!-- Blind test : le titre se dévoile peu à peu -->
+    <div id="hint" hidden><span id="hint-mask"></span> <span id="hint-max" class="muted"></span></div>
     <div id="volume-row">
       <label data-i18n-title="volume">🔊 <input type="range" id="volume" min="0" max="100"></label>
       <button id="show-player" class="icon" data-i18n-title="togglePlayer">📺</button>
@@ -141,6 +150,7 @@
           </select>
         </label>
         <label><input type="checkbox" id="hideVideo"> <span id="hideVideo-label"></span></label>
+        <label><input type="checkbox" id="hints"> <span data-i18n="hints"></span></label>
         <label><span data-i18n="pause"></span>
           <select id="pause">
             <option value="0" data-i18n="pauseManual"></option>
@@ -209,6 +219,7 @@
   </main>
 
   <script src="i18n.js"></script>
+  <script src="presets.js"></script>
   <script src="sidebar.js"></script>
 </body>
 </html>

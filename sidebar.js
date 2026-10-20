@@ -61,6 +61,27 @@ $("#pl-name").addEventListener("keydown", (e) => {
 $("#pl-name").addEventListener("blur", () => editing && stopEditing(true));
 $("#pl-export").addEventListener("click", () => act("exportPlaylist"));
 
+// 📚 : les playlists toutes prêtes ; un clic l'ajoute (ou l'affiche si elle est déjà là)
+let presetsOpen = false;
+$("#pl-presets").addEventListener("click", () => {
+  presetsOpen = !presetsOpen;
+  render();
+});
+
+function renderPresets() {
+  $("#presets").hidden = !presetsOpen;
+  $("#pl-presets").classList.toggle("on", presetsOpen);
+  if (!presetsOpen) return;
+  $("#preset-list").replaceChildren(
+    ...Object.entries(PRESETS).map(([key, preset]) =>
+      button(t("presetCount", preset.name[currentLang()] ?? preset.name.en, preset.items.length), () => {
+        presetsOpen = false;
+        act("addPreset", key);
+      })
+    )
+  );
+}
+
 // Suppression en deux clics (confirm() n'est pas disponible dans la barre latérale)
 let deleteArmed = null;
 $("#pl-delete").addEventListener("click", (e) => {
@@ -211,6 +232,15 @@ $("#chat-secret").addEventListener("click", () => {
 $("#clip").addEventListener("change", (e) => act("setBlind", "clip", Number(e.target.value)));
 $("#startMode").addEventListener("change", (e) => act("setBlind", "startMode", e.target.value));
 $("#hideVideo").addEventListener("change", (e) => act("setBlind", "hideVideo", e.target.checked));
+$("#hints").addEventListener("change", (e) => act("setBlind", "hints", e.target.checked));
+
+// Indice façon pendu (joueurs seulement : l'animateur voit le titre)
+function renderHint(hint) {
+  $("#hint").hidden = !hint?.mask;
+  if (!hint?.mask) return;
+  $("#hint-mask").textContent = hint.mask;
+  $("#hint-max").textContent = t("hintMax", hint.max);
+}
 $("#pause").addEventListener("change", (e) => act("setBlind", "pause", Number(e.target.value)));
 $("#scoring").addEventListener("change", (e) => act("setBlind", "scoring", e.target.value));
 $("#judge").addEventListener("change", (e) => act("setBlind", "judge", e.target.value));
@@ -468,6 +498,7 @@ function renderGuest(g) {
         over: t("gameOver"),
       }[blind.phase] ?? "";
   $("#guest-status").textContent = blind?.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
+  renderHint(blind?.hint ? { mask: blind.hint, max: blind.maxPts } : null);
   $("#guest-claim").hidden = !(blind?.claim && blind.phase === "revealed");
   $("#guest-found").disabled = $("#guest-missed").disabled = claimedRound === blind?.round;
   $("#guest-listen").hidden = !h?.playlist;
@@ -535,9 +566,9 @@ function renderBlind(game, n, multi, room = multi) {
   const writing = !room && !self && ["playing", "timeup", "revealed"].includes(game.phase);
   $("#solo-guess").hidden = !writing;
   if (writing) {
-    $("#guess-list").replaceChildren(...game.guesses.map((g) => el("li", `🔒 ${g}`)));
+    $("#guess-list").replaceChildren(...game.guesses.map((g) => el("li", `🔒 ${g.text}`)));
     if (game.phase === "revealed") $("#guess-list").appendChild(el("li", t("soloPoints", game.lastPoints), "points"));
-    $("#guess-input").disabled = game.phase === "revealed" || game.guesses.length >= 3;
+    $("#guess-input").disabled = game.phase === "revealed";
   }
 
   $("#blind-settings").hidden = !multi && !["idle", "over"].includes(game.phase);
@@ -713,6 +744,7 @@ function render() {
     );
   }
   renderNotice();
+  renderPresets();
 
   const blind = state.mode === "blind" || state.mode === "emcee";
   // On joue (seul, ou avec ses invités) : rien n'est dévoilé pendant la manche
@@ -766,6 +798,8 @@ function render() {
   if (document.activeElement !== $("#clip")) $("#clip").value = String(state.blind.clip);
   if (document.activeElement !== $("#startMode")) $("#startMode").value = state.blind.startMode;
   $("#hideVideo").checked = state.blind.hideVideo;
+  $("#hints").checked = state.blind.hints !== false;
+  renderHint(secret ? view.hint : null);
   if (document.activeElement !== $("#pause")) $("#pause").value = String(state.blind.pause ?? 10);
   if (document.activeElement !== $("#scoring")) $("#scoring").value = state.blind.scoring ?? "auto";
   if (document.activeElement !== $("#judge")) $("#judge").value = state.blind.judge ?? "chat";
