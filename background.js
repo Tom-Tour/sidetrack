@@ -22,7 +22,8 @@ let state = {
   // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
   // pause : secondes de réponse affichée avant la manche suivante (0 = on enchaîne à la main)
   // scoring : points de l'animateur, "auto" (comme les joueurs) ou "manual" (il les donne)
-  blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto" },
+  // judge : blind test joué, points « chat » (à l'écrit) ou « self » (chacun se juge)
+  blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto", judge: "chat" },
   blindDefaults: 2,    // version des réglages par défaut du blind test (voir le démarrage)
   volume: 100,
   lang: "auto",        // "auto" | "fr" | "en"
@@ -642,7 +643,7 @@ function shuffle(a) {
 // (0 = morceau entier, null = inconnue tant que la vidéo n'a pas démarré)
 function resetGame() {
   clearInterval(gameTimer);
-  game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0, clip: 0, chapter: null, nextIn: 0 };
+  game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0, clip: 0, chapter: null, nextIn: 0, guesses: [], lastPoints: 0 };
 }
 
 // Temps écoulé : quelques secondes pour les réponses de dernière seconde, puis la réponse
@@ -689,6 +690,8 @@ async function blindPick(i, chapter = null) {
 function nextRound() {
   clearInterval(gameTimer);
   game.pos++;
+  game.guesses = [];
+  game.lastPoints = 0;
   if (game.pos >= game.order.length) {
     game.phase = "over";
     send({ action: "pause" });
@@ -746,6 +749,13 @@ function reveal() {
   game.answered = false;
   unmaskGuesses();
   autoScore();
+  // Seul, points à l'écrit : la meilleure réponse de la manche, sur 10
+  if (!room && state.blind.judge !== "self") {
+    game.lastPoints = soloPoints();
+    game.score += game.lastPoints;
+    game.played += 10;
+    game.answered = true;
+  }
   send({ action: "play" });
   // Partie automatique : la manche suivante part après la pause réglée
   game.nextIn = state.blind.pause > 0 ? state.blind.pause : 0;
@@ -753,8 +763,8 @@ function reveal() {
     gameTimer = setInterval(() => {
       game.nextIn--;
       if (game.nextIn > 0) return update();
-      // Seul, sans réponse donnée : la manche compte comme ratée
-      if (!room) answer(false);
+      // Seul et juge de soi-même, sans réponse donnée : la manche compte comme ratée
+      if (!room && state.blind.judge === "self") answer(false);
       else nextRound();
     }, 1000);
   }
@@ -815,6 +825,7 @@ const actions = {
   leaveRoom: () => leaveRoom(),
   guestChat: (text, secret) => guestChat(text, secret),
   guestRef: (ref) => guestRef(ref),
+  guestClaim: (found) => guestSend({ t: "claim", found: found === true }),
   shareMoment: () => shareMoment(),
   hostChat: (text, secret) => hostChat(text, null, secret),
   award: (playerId, delta) => award(playerId, delta),
@@ -837,6 +848,15 @@ const actions = {
   },
   setMode,
   startGame,
+  // Blind test solo, points à l'écrit : nos réponses de la manche (3 au plus)
+  soloGuess: (text) => {
+    text = cleanText(text, 120);
+    if (!text || room || !["playing", "timeup"].includes(game.phase) || game.guesses.length >= GUESSES_PER_ROUND) return;
+    game.guesses.push(text);
+    update();
+  },
+  // « Trouvé / Raté » : seul, on compte sa manche ; dans un salon, on se donne son point
+  claim: (found) => (room ? claim("host", found) : answer(found)),
   nextRound,
   blindPick,
   reveal,
@@ -847,6 +867,7 @@ const actions = {
     if (key === "startMode" && value !== "chapter" && state.blind.clip === -1) state.blind.clip = 20;
     if (key === "pause") state.blind.pause = Math.max(0, Math.min(60, Number(value) || 0));
     if (key === "scoring") state.blind.scoring = value === "manual" ? "manual" : "auto";
+    if (key === "judge") state.blind.judge = value === "self" ? "self" : "chat";
     update();
     save();
   },

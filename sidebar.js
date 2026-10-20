@@ -213,6 +213,23 @@ $("#startMode").addEventListener("change", (e) => act("setBlind", "startMode", e
 $("#hideVideo").addEventListener("change", (e) => act("setBlind", "hideVideo", e.target.checked));
 $("#pause").addEventListener("change", (e) => act("setBlind", "pause", Number(e.target.value)));
 $("#scoring").addEventListener("change", (e) => act("setBlind", "scoring", e.target.value));
+$("#judge").addEventListener("change", (e) => act("setBlind", "judge", e.target.value));
+$("#guess-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("#guess-input").value.trim();
+  if (!text) return;
+  act("soloGuess", text);
+  $("#guess-input").value = "";
+});
+// Invité, chacun se juge : une réponse par manche
+let claimedRound = 0;
+for (const [id, found] of [["#guest-found", true], ["#guest-missed", false]]) {
+  $(id).addEventListener("click", () => {
+    claimedRound = view.guest?.host?.blind?.round ?? 0;
+    act("guestClaim", found);
+    render();
+  });
+}
 
 // --- Affichage -------------------------------------------------------------
 
@@ -388,6 +405,7 @@ function renderRoom(blind) {
   const hostChip = () => {
     const li = el("li", null, guest ? "" : "me");
     li.append(el("span", t("host")), el("b", String(hostScore)));
+    if (!guest) li.append(button("+1", () => act("award", "host", 1)), button("−1", () => act("award", "host", -1)));
     return li;
   };
   $("#room-players").replaceChildren(
@@ -450,6 +468,8 @@ function renderGuest(g) {
         over: t("gameOver"),
       }[blind.phase] ?? "";
   $("#guest-status").textContent = blind?.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
+  $("#guest-claim").hidden = !(blind?.claim && blind.phase === "revealed");
+  $("#guest-found").disabled = $("#guest-missed").disabled = claimedRound === blind?.round;
   $("#guest-listen").hidden = !h?.playlist;
   if (!h?.playlist) return;
   $("#share-moment").disabled = !g.videoId;
@@ -485,66 +505,90 @@ function renderGuest(g) {
   );
 }
 
+// multi : animateur (il arbitre) ; room : dans un salon, qu'on anime ou qu'on joue
 function renderBlind(game, n, multi, room = multi) {
   const status = $("#blind-status");
-  const actions = $("#blind-actions");
+  const blind = view.state.blind;
+  const self = !multi && blind.judge === "self"; // chacun se juge (Trouvé / Raté)
   const total = game.order.length;
   // Score « x/y » en solo seulement : dans un salon, les points s'affichent sur les pastilles
   const round = room
     ? t("round", game.pos + 1, total)
     : `${t("round", game.pos + 1, total)} · ${t("score", game.score, game.played)}`;
-
-  switch (game.phase) {
-    case "idle":
-      status.textContent = n ? t("tracks", n) : t("emptyShort");
-      actions.replaceChildren(button(t("startGame"), () => act("startGame")));
-      actions.firstChild.disabled = !n;
-      break;
-    case "loading":
-      status.textContent = t("loadingChapters");
-      actions.replaceChildren();
-      break;
-    case "playing":
-      status.textContent = round;
-      actions.replaceChildren(
-        ...(multi ? [playPause()] : []),
-        button(t("reveal"), () => act("reveal")),
-        button(t("skip"), () => act("nextRound"))
-      );
-      break;
-    case "timeup":
-      status.textContent = `${round} · ${t("timeUpBang")}`;
-      actions.replaceChildren(
-        ...(multi ? [playPause(), button(t("reveal"), () => act("reveal")), button(t("skip"), () => act("nextRound"))] : [button(t("reveal"), () => act("reveal"))])
-      );
-      break;
-    case "revealed": {
-      const manual = multi && view.state.blind.scoring === "manual";
-      const next = game.nextIn ? ` · ${t("nextIn", game.nextIn)}` : "";
-      status.textContent = `${round}${manual ? ` · ${t("givePoints")}` : room ? ` · ${t("autoPoints")}` : ""}${next}`;
-      actions.replaceChildren(
-        ...(multi
-          ? [playPause(), button(t("nextRound"), () => act("nextRound"))]
-          : room
-            ? [button(t("nextRound"), () => act("nextRound"))]
-            : [
-              button(t("found"), () => act("answer", true), "good"),
-              button(t("missed"), () => act("answer", false), "bad"),
-            ])
-      );
-      break;
-    }
-    case "over":
-      status.textContent = t("gameOver");
-      if (!room) {
-        status.append(" : ");
-        status.appendChild(el("strong", `${game.score}/${game.played}`));
-      }
-      actions.replaceChildren(button(t("replay"), () => act("startGame")));
-      break;
+  const how = multi ? (blind.scoring === "manual" ? t("givePoints") : t("autoPoints")) : room ? t(self ? "selfPoints" : "autoPoints") : "";
+  const next = game.nextIn ? ` · ${t("nextIn", game.nextIn)}` : "";
+  status.textContent = {
+    idle: n ? t("tracks", n) : t("emptyShort"),
+    loading: t("loadingChapters"),
+    playing: round,
+    timeup: `${round} · ${t("timeUpBang")}`,
+    revealed: `${round}${how ? ` · ${how}` : ""}${next}`,
+    over: t("gameOver"),
+  }[game.phase];
+  if (game.phase === "over" && !room) {
+    status.append(" : ");
+    status.appendChild(el("strong", `${game.score}/${game.played}`));
   }
+  $("#blind-actions").replaceChildren(...(multi ? emceeControls(game, n) : playerActions(game, n, room, self)));
+
+  // Seul, points à l'écrit : champ de réponse et réponses de la manche
+  const writing = !room && !self && ["playing", "timeup", "revealed"].includes(game.phase);
+  $("#solo-guess").hidden = !writing;
+  if (writing) {
+    $("#guess-list").replaceChildren(...game.guesses.map((g) => el("li", `🔒 ${g}`)));
+    if (game.phase === "revealed") $("#guess-list").appendChild(el("li", t("soloPoints", game.lastPoints), "points"));
+    $("#guess-input").disabled = game.phase === "revealed" || game.guesses.length >= 3;
+  }
+
   $("#blind-settings").hidden = !multi && !["idle", "over"].includes(game.phase);
   $("#hideVideo-label").textContent = t(room ? "hideVideoGuests" : "hideVideo");
+  $("#judge-row").hidden = multi;
+  $("#scoring-row").hidden = !multi;
+}
+
+// Animateur : quatre boutons comme en mode Playlist, la liste des pistes en dessous
+function emceeControls(game, n) {
+  const live = ["playing", "timeup"].includes(game.phase);
+  const b = (label, title, cmd, enabled) => {
+    const x = button(label, () => act(cmd));
+    x.title = t(title);
+    x.disabled = !enabled;
+    return x;
+  };
+  return [
+    b("🔀", "newGame", "startGame", n > 0 && game.phase !== "loading"),
+    b(view.playerState === 1 ? "⏸" : "▶", "playPause", "playPause", !["idle", "over", "loading"].includes(game.phase)),
+    b("👁", "revealTitle", "reveal", live),
+    b("⏭", "nextRoundTitle", "nextRound", live || game.phase === "revealed"),
+  ];
+}
+
+// On joue : démarrer, révéler, passer ; à la révélation, se juger ou passer à la suite
+function playerActions(game, n, room, self) {
+  switch (game.phase) {
+    case "idle": {
+      const start = button(t("startGame"), () => act("startGame"));
+      start.disabled = !n;
+      return [start];
+    }
+    case "playing":
+      return [button(t("reveal"), () => act("reveal")), button(t("skip"), () => act("nextRound"))];
+    case "timeup":
+      return [button(t("reveal"), () => act("reveal"))];
+    case "revealed": {
+      const nextBtn = button(t("nextRound"), () => act("nextRound"));
+      if (!self) return [nextBtn];
+      const done = room ? !!view.room.hostClaimed : !!game.answered;
+      const found = button(t("found"), () => act("claim", true), "good");
+      const missed = button(t("missed"), () => act("claim", false), "bad");
+      found.disabled = missed.disabled = done;
+      return room ? [found, missed, nextBtn] : [found, missed];
+    }
+    case "over":
+      return [button(t("replay"), () => act("startGame"))];
+    default:
+      return [];
+  }
 }
 
 // Hôte d'un salon : lecture / pause du morceau de la manche (pour réécouter, faire durer…)
@@ -724,6 +768,7 @@ function render() {
   $("#hideVideo").checked = state.blind.hideVideo;
   if (document.activeElement !== $("#pause")) $("#pause").value = String(state.blind.pause ?? 10);
   if (document.activeElement !== $("#scoring")) $("#scoring").value = state.blind.scoring ?? "auto";
+  if (document.activeElement !== $("#judge")) $("#judge").value = state.blind.judge ?? "chat";
   $("#scoring-row").hidden = !referee;
 
   $("#host-tracks").hidden = !referee;

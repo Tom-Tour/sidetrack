@@ -350,6 +350,9 @@ function onPlayerData(p, msg) {
     case "chat":
       addChat({ from: p.id, name: p.name, color: p.color, text: cleanText(msg.text, TEXT_MAX), ref: cleanRef(msg.ref), secret: msg.secret !== false });
       break;
+    case "claim":
+      claim(p.id, msg.found === true);
+      break;
     case "ping":
       safeSend(p.conn, { t: "pong", at: Number(msg.at) || 0 });
       break;
@@ -458,6 +461,56 @@ function looksRight(guess, parts) {
   });
 }
 
+// Points d'une proposition, de 0 à 10. 10 si elle est reconnue comme juste (mêmes règles que
+// « probable »), sinon des points partiels dès 4 lettres consécutives en commun avec un morceau
+// du titre (« never gonna » → 5 sur « Never Gonna Give You Up »), ou des mots du titre retrouvés.
+const GUESSES_PER_ROUND = 3; // seules les 3 premières réponses comptent : pas de pêche au hasard
+
+function commonRun(a, b) {
+  let best = 0;
+  let prev = new Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = new Array(b.length + 1).fill(0);
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) best = Math.max(best, (cur[j] = prev[j - 1] + 1));
+    }
+    prev = cur;
+  }
+  return best;
+}
+
+function guessPoints(guess, parts) {
+  if (looksRight(guess, parts)) return 10;
+  const g = simplify(guess);
+  const letters = g.replace(/ /g, "");
+  if (letters.length < 4) return 0;
+  const gWords = new Set(g.split(" ").filter((w) => w.length >= 3));
+  let best = 0;
+  for (const part of parts) {
+    const target = part.replace(/ /g, "");
+    const run = commonRun(letters, target);
+    let pts = run >= 4 ? Math.round((9 * run) / target.length) : 0;
+    const words = part.split(" ").filter((w) => w.length >= 3);
+    const found = words.filter((w) => gWords.has(w)).length;
+    if (found) pts = Math.max(pts, Math.round((9 * found) / words.length));
+    if (run >= 4 || found) best = Math.max(best, Math.min(9, Math.max(1, pts)));
+  }
+  return best;
+}
+
+// Morceaux de la réponse de la manche en cours (titre du chapitre, ou de la vidéo)
+function roundParts() {
+  const item = items()[state.index];
+  return item ? answerParts(game.chapter?.title, game.chapter ? null : item.title) : null;
+}
+
+// Blind test solo, points à l'écrit : la meilleure de nos réponses de la manche
+function soloPoints() {
+  const parts = roundParts();
+  if (!parts) return 0;
+  return Math.max(0, ...game.guesses.slice(0, GUESSES_PER_ROUND).map((g) => guessPoints(g, parts)));
+}
+
 function guessHint(text) {
   if (!inGame() || !["playing", "timeup", "revealed"].includes(game.phase) || !text) return false;
   const item = items()[state.index];
@@ -483,7 +536,8 @@ function addChat({ secret = true, ...entry }) {
     id: ++chatSeq,
     at: Date.now(),
     private: player && secret && guessing(),
-    round: player && guessing() ? game.pos : null, // proposition de cette manche (points automatiques)
+    // Réponse cachée de cette manche (points à l'écrit) ; un message en clair n'est que du chat
+    round: player && secret && guessing() ? game.pos : null,
     hint: fromGuest && guessHint(entry.text), // jamais envoyé aux invités
   };
   room.chat.push(msg);
@@ -544,18 +598,33 @@ function resetScores() {
 // proche du titre (ou du chapitre), selon les mêmes règles que l'indice « probable ».
 // L'animateur peut préférer donner les points lui-même (réglage « Points »).
 function autoScore() {
-  if (!room || (state.mode === "emcee" && state.blind.scoring === "manual")) return;
-  const item = items()[state.index];
-  if (!item) return;
-  const parts = answerParts(game.chapter?.title, game.chapter ? null : item.title);
-  const found = new Set();
+  if (!room) return;
+  // Animateur qui donne les points lui-même, ou joueurs qui se jugent eux-mêmes
+  if (state.mode === "emcee" ? state.blind.scoring === "manual" : state.blind.judge === "self") return;
+  const parts = roundParts();
+  if (!parts) return;
+  const tries = new Map();
+  const best = new Map();
   for (const msg of room.chat) {
-    if (msg.round !== game.pos || !msg.text || found.has(msg.from)) continue;
+    if (msg.round !== game.pos || !msg.text) continue;
     if (state.mode === "emcee" && msg.from === "host") continue; // l'animateur ne joue pas
-    if (looksRight(msg.text, parts)) found.add(msg.from);
+    const n = (tries.get(msg.from) ?? 0) + 1;
+    tries.set(msg.from, n);
+    if (n <= GUESSES_PER_ROUND) best.set(msg.from, Math.max(best.get(msg.from) ?? 0, guessPoints(msg.text, parts)));
   }
-  if (!found.size) return systemMessage("chatNobody");
-  for (const id of found) award(id, 1);
+  const scored = [...best].filter(([, pts]) => pts > 0).sort((a, b) => b[1] - a[1]);
+  if (!scored.length) return systemMessage("chatNobody");
+  for (const [id, pts] of scored) award(id, pts);
+}
+
+// Chacun se juge : après la révélation, chaque joueur dit s'il a trouvé (une fois par manche)
+function claim(id, found) {
+  if (!room || state.mode !== "blind" || state.blind.judge !== "self" || game.phase !== "revealed") return;
+  if (room.claims?.round !== game.pos) room.claims = { round: game.pos, ids: new Set() };
+  if (room.claims.ids.has(id)) return;
+  room.claims.ids.add(id);
+  if (found) award(id, 1);
+  else update();
 }
 
 // --- État partagé avec les invités -------------------------------------------
@@ -592,6 +661,7 @@ function publicState() {
           hideVideo: state.blind.hideVideo,
           answer: game.phase === "revealed" ? currentAnswer() : null,
           nextIn: game.phase === "revealed" ? game.nextIn : 0,
+          claim: state.mode === "blind" && state.blind.judge === "self", // chacun se juge
         },
     // L'hôte joue lui aussi : son score s'affiche avec ceux des invités
     hostScore: state.mode === "blind" ? room.hostScore ?? 0 : null,
@@ -632,6 +702,7 @@ function roomSnapshot() {
     public: room.public,
     players: playerList(),
     hostScore: room.hostScore ?? 0,
+    hostClaimed: room.claims?.round === game.pos && room.claims.ids.has("host"),
     chat: room.chat,
   };
 }

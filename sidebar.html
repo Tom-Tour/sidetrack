@@ -79,6 +79,10 @@
     <!-- Invité dans le salon de quelqu'un : c'est l'hôte qui choisit la musique -->
     <section id="guest" hidden>
       <div id="guest-status"></div>
+      <div id="guest-claim" class="controls" hidden>
+        <button id="guest-found" class="good" data-i18n="found"></button>
+        <button id="guest-missed" class="bad" data-i18n="missed"></button>
+      </div>
       <div id="guest-listen">
         <div class="line">
           <span class="muted" data-i18n="hostPlaylist"></span>
@@ -102,6 +106,22 @@
     <section id="blind" hidden>
       <div id="blind-status"></div>
       <div id="blind-actions" class="controls"></div>
+      <!-- Seul, points à l'écrit : nos réponses de la manche -->
+      <div id="solo-guess" hidden>
+        <form id="guess-form" class="line">
+          <input type="text" id="guess-input" data-i18n-placeholder="guessPlaceholder" autocomplete="off" maxlength="120">
+          <button type="submit" data-i18n="sendChat"></button>
+        </form>
+        <ul id="guess-list"></ul>
+      </div>
+      <!-- Hôte d'un salon : liste des pistes, clic = prochaine manche -->
+      <div id="host-tracks" hidden>
+        <div class="line">
+          <span id="host-tracks-title" class="muted"></span>
+          <button id="host-tracks-toggle"></button>
+        </div>
+        <ol id="host-queue"></ol>
+      </div>
       <fieldset id="blind-settings">
         <label><span data-i18n="clipLength"></span>
           <select id="clip">
@@ -131,6 +151,13 @@
             <option value="30">30 s</option>
           </select>
         </label>
+        <!-- Blind test joué (seul ou dans un salon) -->
+        <label id="judge-row"><span data-i18n="judge"></span>
+          <select id="judge">
+            <option value="chat" data-i18n="judgeChat"></option>
+            <option value="self" data-i18n="judgeSelf"></option>
+          </select>
+        </label>
         <!-- Animateur seulement -->
         <label id="scoring-row" hidden><span data-i18n="scoring"></span>
           <select id="scoring">
@@ -139,14 +166,6 @@
           </select>
         </label>
       </fieldset>
-      <!-- Hôte d'un salon : liste des pistes, clic = prochaine manche -->
-      <div id="host-tracks" hidden>
-        <div class="line">
-          <span id="host-tracks-title" class="muted"></span>
-          <button id="host-tracks-toggle"></button>
-        </div>
-        <ol id="host-queue"></ol>
-      </div>
     </section>
   </main>
 

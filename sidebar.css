@@ -132,8 +132,13 @@ li.loading > .row::after {
 
 #blind-status { margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
 #blind-status strong { font-size: 15px; }
-#blind-actions .good { color: var(--good); border-color: var(--good); }
-#blind-actions .bad { color: var(--bad); border-color: var(--bad); }
+#blind-actions .good, #guest-claim .good { color: var(--good); border-color: var(--good); }
+#blind-actions .bad, #guest-claim .bad { color: var(--bad); border-color: var(--bad); }
+#solo-guess { margin-top: 8px; }
+#guess-list { list-style: none; margin: 4px 0 0; padding: 0; }
+#guess-list li { padding: 1px 4px; color: var(--accent); }
+#guess-list li.points { color: var(--good); font-weight: 600; }
+#guest-claim { margin: 4px 0; }
 #blind-settings { margin: 8px 0 0; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
 #blind-settings label { display: block; margin: 4px 0; }
 

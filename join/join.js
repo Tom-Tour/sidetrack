@@ -43,8 +43,10 @@ const STRINGS = {
     blindOver: "Partie terminée",
     chatJoined: "{0} a rejoint le salon",
     chatLeft: "{0} est parti",
-    chatPointPlus: "+{0} point pour {1} ({2})",
-    chatPointMinus: "{0} point pour {1} ({2})",
+    chatPointPlus: "+{0} pour {1} (total {2})",
+    chatPointMinus: "{0} pour {1} (total {2})",
+    found: "✓ Trouvé",
+    missed: "✗ Raté",
     chatFlood: "{0} envoie trop de messages : sourdine pendant 1 minute",
     chatKicked: "{0} a été exclu du salon",
     chatBanned: "{0} a été banni",
@@ -97,8 +99,10 @@ const STRINGS = {
     blindOver: "Game over",
     chatJoined: "{0} joined the room",
     chatLeft: "{0} left",
-    chatPointPlus: "+{0} point for {1} ({2})",
-    chatPointMinus: "{0} point for {1} ({2})",
+    chatPointPlus: "+{0} for {1} (total {2})",
+    chatPointMinus: "{0} for {1} (total {2})",
+    found: "✓ Got it",
+    missed: "✗ Missed",
     chatFlood: "{0} is sending too many messages: muted for 1 minute",
     chatKicked: "{0} was kicked from the room",
     chatBanned: "{0} was banned",
@@ -491,6 +495,16 @@ function flash(text) {
   flashTimer = setTimeout(() => ($("#chat-note").hidden = true), 4000);
 }
 
+// Chacun se juge : « Trouvé » ou « Raté », une fois par manche
+let claimedRound = 0;
+for (const [id, found] of [["#claim-found", true], ["#claim-missed", false]]) {
+  $(id).addEventListener("click", () => {
+    claimedRound = room?.blind?.round ?? 0;
+    send({ t: "claim", found });
+    render();
+  });
+}
+
 // En blind test, chacun choisit d'écrire sa réponse cachée (par défaut) ou en clair
 let secretGuess = true;
 $("#chat-secret").addEventListener("click", () => {
@@ -645,4 +659,7 @@ function render() {
     over: t("blindOver"),
   }[blind.phase];
   $("#blind-status").textContent = blind.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
+  // Chacun se juge : une réponse par manche, après la révélation
+  $("#claim").hidden = !(blind.claim && blind.phase === "revealed");
+  $("#claim-found").disabled = $("#claim-missed").disabled = claimedRound === blind.round;
 }
