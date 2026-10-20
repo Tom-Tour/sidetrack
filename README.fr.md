@@ -2,7 +2,7 @@
 
 [English](README.md) · **Français**
 
-[![Soutenir sur Ko-fi](https://img.shields.io/badge/Ko--fi-Soutenir-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/tom_t)
+[![Installer depuis Firefox Add-ons](https://img.shields.io/badge/Firefox-Installer%20le%20module-FF7139?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/fr/firefox/addon/sidetrack/) [![Soutenir sur Ko-fi](https://img.shields.io/badge/Ko--fi-Soutenir-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/tom_t)
 
 Une extension Firefox pour écouter des playlists YouTube locales dans la barre latérale pendant que tu navigues, jouer au blind test seul ou à plusieurs, et écouter ensemble dans des salons.
 
@@ -42,12 +42,17 @@ Les limites, honnêtement :
 
 ## Installation
 
+Installe-le depuis **[addons.mozilla.org](https://addons.mozilla.org/fr/firefox/addon/sidetrack/)** (Firefox 140 ou plus récent).
+
+À la première ouverture dans une session Firefox, un onglet Sidetrack apparaît : clique sur **Lancer Sidetrack** (Firefox n'autorise le son qu'après un clic dans la page). L'onglet se range ensuite tout seul et reste prêt jusqu'à la fermeture de Firefox. Pour ne plus jamais avoir cette étape, autorise la lecture automatique pour `tom-tour.github.io` (Paramètres → Vie privée et sécurité → Permissions → Lecture automatique → Paramètres…).
+
+Pour essayer la version de développement, en module temporaire :
+
 1. Ouvre `about:debugging#/runtime/this-firefox`
 2. Clique sur **Charger un module complémentaire temporaire…** et choisis `manifest.json`
 3. Ouvre la barre latérale avec `Alt+Maj+Y` ou le bouton de la barre d'outils
-4. À la première ouverture dans une session Firefox, un onglet Sidetrack apparaît : clique sur **Lancer Sidetrack** (Firefox n'autorise le son qu'après un clic dans la page). L'onglet se range ensuite tout seul et reste prêt jusqu'à la fermeture de Firefox. Pour ne plus jamais avoir cette étape, autorise la lecture automatique pour `tom-tour.github.io` (Paramètres → Vie privée et sécurité → Permissions → Lecture automatique → Paramètres…)
 
-Un module temporaire est retiré à la fermeture de Firefox, et ses données avec lui : sauvegarde tes playlists (⚙ → Sauvegarde) avant de fermer, ou installe une version signée.
+Un module temporaire est retiré à la fermeture de Firefox, et ses données avec lui : sauvegarde tes playlists (⚙ → Sauvegarde) avant de fermer, ou installe-le depuis addons.mozilla.org.
 
 ## Fonctionnement
 
