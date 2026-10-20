@@ -18,7 +18,7 @@ A Firefox extension to build local playlists from YouTube links and play them in
 - Chat: guests' names are unique and colored; in blind test the host sees a “✓ likely” mark on guesses that look like the title (the host still decides); unread badge on 🌐 and optional sound
 - Export a playlist to YouTube (no login or API key needed, 50 videos per link)
 - Settings page (⚙): language, hide multiplayer if you only play solo, log
-- **Ready-made playlists** (📚): video game music and anime openings, official uploads only (artists, composers, labels, publishers), so listening pays the people who made them
+- **Ready-made playlists** (📚): video game music, epic dark fantasy and space soundtracks, anime openings (official uploads only (artists, composers, labels, publishers), so listening pays the people who made them), and the video game music DJ mixes of dedeco, one round per track in chapter mode
 - English and French (automatic, or chosen in the settings); guests pick their own language
 - Everything is stored locally in Firefox
 
