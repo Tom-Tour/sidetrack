@@ -56,14 +56,8 @@ const STRINGS = {
     guestWaiting: "En attente d'une vidéo…",
 
     // Fiche d'un joueur (hôte) : exclure, bannir
-    kickAsk: "Exclure…",
-    kickConfirmTitle: "Exclure {0} ?",
     kickConfirmHelp: "Il quitte le salon tout de suite et ne peut plus y revenir tant que le salon reste ouvert.",
-    kickConfirm: "Exclure {0}",
-    banAsk: "⛔ Bannir…",
-    banConfirmTitle: "Bannir {0} ?",
     banConfirmHelp: "Il quitte le salon tout de suite et ne pourra plus entrer dans aucun de tes salons, même plus tard. Ses messages disparaissent. Tu peux le débannir dans les réglages.",
-    banConfirm: "Bannir {0}",
 
     // Lecture
     modePlaylist: "🎵 Playlist",
@@ -140,10 +134,7 @@ const STRINGS = {
     blindRevealed: "Réponse : {0}",
 
     // Réglages
-    general: "Général",
-    display: "Affichage",
     multiplayer: "Multijoueur",
-    profile: "Profil",
     showMulti: "Activer le multijoueur",
     showMultiHelp: "Bouton 🌐 : créer ou rejoindre un salon pour écouter ou jouer ensemble. Décoche-le si tu utilises Sidetrack seul.",
     showPresets: "Afficher le bouton 📚 des playlists toutes prêtes",
@@ -285,14 +276,8 @@ const STRINGS = {
     shareMomentTitle: "Send this moment of the video to the chat",
     guestWaiting: "Waiting for a video…",
 
-    kickAsk: "Kick…",
-    kickConfirmTitle: "Kick {0}?",
     kickConfirmHelp: "They leave the room right away and can't come back while the room stays open.",
-    kickConfirm: "Kick {0}",
-    banAsk: "⛔ Ban…",
-    banConfirmTitle: "Ban {0}?",
     banConfirmHelp: "They leave the room right away and won't be able to enter any of your rooms, even later. Their messages disappear. You can unban them in the settings.",
-    banConfirm: "Ban {0}",
 
     modePlaylist: "🎵 Playlist",
     modeBlind: "❓ Blind test",
@@ -366,10 +351,7 @@ const STRINGS = {
     blindPlaying: "Mystery track: type your answer in the chat!",
     blindRevealed: "Answer: {0}",
 
-    general: "General",
-    display: "Display",
     multiplayer: "Multiplayer",
-    profile: "Profile",
     showMulti: "Enable multiplayer",
     showMultiHelp: "🌐 button: create or join a room to listen or play together. Untick it if you use Sidetrack alone.",
     showPresets: "Show the 📚 button for ready-made playlists",

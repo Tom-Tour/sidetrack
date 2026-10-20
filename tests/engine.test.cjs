@@ -54,10 +54,11 @@ const { until, check, done, makeEngine, playlist, FakeWorker } = require("./harn
     check("rejoindre deux fois : une seule présence", host.snap().room.players.length === 1);
 
     // --- Chat, limites ---
-    bob.act("guestChat", "salut");
+    // Un caractère d'inversion du sens d'écriture glissé dans le texte est retiré à l'arrivée
+    bob.act("guestChat", "sa" + String.fromCharCode(0x202e) + "lut");
     await until(() => host.snap().room.chat.some((m) => m.text === "salut"));
     const m = host.snap().room.chat.find((x) => x.text === "salut");
-    check("message de Bob reçu avec son code", m.code === codeBob && m.name === "Bob");
+    check("message de Bob reçu avec son code, nettoyé", m.code === codeBob && m.name === "Bob");
     host.act("hostChat", "bienvenue");
     const tooFast = [await host.ask("hostChat", "un"), await host.ask("hostChat", "deux"), await host.ask("hostChat", "trois")];
     check("hôte : réponse errTooFast au-delà de 2 messages par seconde", tooFast.includes("errTooFast"), JSON.stringify(tooFast));

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff6a4d"/>
+      <stop offset="1" stop-color="#e02a6b"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".25"/>
+    </filter>
+  </defs>
+  <rect width="96" height="96" rx="22" fill="url(#bg)"/>
+  <!-- la fenêtre et sa barre latérale -->
+  <rect x="16" y="20" width="64" height="56" rx="8" fill="#fff" opacity=".28"/>
+  <rect x="16" y="20" width="30" height="56" rx="8" fill="#fff" filter="url(#sh)"/>
+  <!-- lecture, dans la barre latérale -->
+  <path d="M25 37 L39 48 L25 59 Z" fill="#e8365f" stroke="#e8365f" stroke-width="4" stroke-linejoin="round"/>
+  <!-- le son qui en sort -->
+  <path d="M55 38 A14 14 0 0 1 55 58" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M63 31 A23 23 0 0 1 63 65" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+</svg>

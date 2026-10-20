@@ -1,8 +1,9 @@
 {
   "manifest_version": 2,
-  "name": "Sidetrack",
+  "name": "__MSG_extName__",
   "version": "1.0.0",
-  "description": "YouTube playlists in the sidebar while you browse, blind test (solo or with friends), rooms to listen together.",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "browser_specific_settings": {
     "gecko": {
       "id": "sidetrack@tom-tour",
@@ -18,8 +19,8 @@
     }
   },
   "icons": {
-    "48": "icons/sidetrack.svg",
-    "96": "icons/sidetrack.svg"
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
   },
   "permissions": [
     "storage",
@@ -54,12 +55,12 @@
   ],
   "browser_action": {
     "default_title": "Sidetrack",
-    "default_icon": "icons/sidetrack.svg"
+    "default_icon": "icons/icon.svg"
   },
   "sidebar_action": {
     "default_title": "Sidetrack",
     "default_panel": "sidebar.html",
-    "default_icon": "icons/sidetrack.svg",
+    "default_icon": "icons/icon.svg",
     "open_at_install": true
   },
   "commands": {

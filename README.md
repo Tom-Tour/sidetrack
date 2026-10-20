@@ -1,6 +1,6 @@
-**English** · [Français](README.fr.md)
+# <img src="icons/icon.svg" width="40" align="top" alt=""> Sidetrack
 
-# Sidetrack
+**English** · [Français](README.fr.md)
 
 [![Support me on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20me-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/tom_t)
 
