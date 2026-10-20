@@ -32,6 +32,7 @@ let state = {
   chatSound: false,    // petit son à chaque nouveau message du salon
   nickname: "",        // pseudo dans les salons des autres
   hideTab: true,       // ranger l'onglet du lecteur hors de la barre d'onglets (tabs.hide)
+  showPresets: true,   // bouton 📚 des playlists toutes prêtes
   banned: {},          // identité (clé publique) → dernier nom connu : refusés dans nos salons
 };
 
@@ -994,7 +995,7 @@ const actions = {
     save();
   },
   setSetting: (key, value) => {
-    if (!["lang", "showMulti", "chatSound", "nickname", "hideTab"].includes(key)) return;
+    if (!["lang", "showMulti", "chatSound", "nickname", "hideTab", "showPresets"].includes(key)) return;
     state[key] = key === "nickname" ? cleanText(value, 24) : value;
     if (key === "hideTab") applyHideTab();
     if (key === "lang") setLang(value);

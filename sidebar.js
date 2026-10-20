@@ -69,6 +69,9 @@ $("#pl-presets").addEventListener("click", () => {
 });
 
 function renderPresets() {
+  const shown = view.state.showPresets !== false;
+  $("#pl-presets").hidden = !shown;
+  if (!shown) presetsOpen = false;
   $("#presets").hidden = !presetsOpen;
   $("#pl-presets").classList.toggle("on", presetsOpen);
   if (!presetsOpen) return;
@@ -123,6 +126,7 @@ $("#lang").addEventListener("change", (e) => act("setSetting", "lang", e.target.
 $("#show-multi").addEventListener("change", (e) => act("setSetting", "showMulti", e.target.checked));
 $("#chat-sound").addEventListener("change", (e) => act("setSetting", "chatSound", e.target.checked));
 $("#hide-tab").addEventListener("change", (e) => act("setSetting", "hideTab", e.target.checked));
+$("#show-presets").addEventListener("change", (e) => act("setSetting", "showPresets", e.target.checked));
 $("#nickname").addEventListener("change", (e) => act("setSetting", "nickname", e.target.value));
 
 // Sauvegarde : un fichier JSON avec toutes les playlists, téléchargé depuis le panneau
@@ -849,6 +853,7 @@ function renderSettings(state) {
   $("#show-multi").checked = state.showMulti !== false;
   $("#chat-sound").checked = !!state.chatSound;
   $("#hide-tab").checked = state.hideTab !== false;
+  $("#show-presets").checked = state.showPresets !== false;
   const banned = Object.entries(state.banned ?? {});
   $("#banned").replaceChildren(
     ...(banned.length
