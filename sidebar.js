@@ -125,6 +125,39 @@ $("#chat-sound").addEventListener("change", (e) => act("setSetting", "chatSound"
 $("#hide-tab").addEventListener("change", (e) => act("setSetting", "hideTab", e.target.checked));
 $("#nickname").addEventListener("change", (e) => act("setSetting", "nickname", e.target.value));
 
+// Sauvegarde : un fichier JSON avec toutes les playlists, téléchargé depuis le panneau
+$("#backup-save").addEventListener("click", () => {
+  const backup = {
+    app: "sidetrack",
+    version: 1,
+    saved: new Date().toISOString(),
+    playlists: view.state.playlists.map(({ id, name, preset, items }) => ({ id, name, preset, items })),
+  };
+  const name = `sidetrack-playlists-${new Date().toISOString().slice(0, 10)}.json`;
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 1)], { type: "application/json" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  act("logBackup", backup.playlists.length, name);
+});
+
+// Restauration : le moteur vérifie le contenu du fichier avant de l'ajouter
+$("#backup-restore").addEventListener("click", () => $("#backup-file").click());
+$("#backup-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  let data = null;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    // pas du JSON : le moteur le signalera comme fichier invalide
+  }
+  act("restorePlaylists", data);
+});
+
 // --- Salon -------------------------------------------------------------------
 
 // Bouton 🌐 : affiche les deux lignes du salon au-dessus des onglets

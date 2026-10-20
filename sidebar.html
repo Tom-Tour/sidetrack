@@ -202,6 +202,16 @@
       </label>
       <p class="muted" data-i18n="ipNotice"></p>
     </fieldset>
+    <!-- Sauvegarde des playlists dans un fichier, et restauration -->
+    <fieldset>
+      <legend data-i18n="backup"></legend>
+      <p class="muted" data-i18n="backupHelp"></p>
+      <div class="line">
+        <button id="backup-save" data-i18n="backupSave"></button>
+        <button id="backup-restore" data-i18n="backupRestore"></button>
+        <input type="file" id="backup-file" accept=".json,application/json" hidden>
+      </div>
+    </fieldset>
     <fieldset>
       <legend data-i18n="bannedList"></legend>
       <ul id="banned"></ul>

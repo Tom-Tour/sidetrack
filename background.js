@@ -138,6 +138,49 @@ function selectPlaylist(id) {
   save();
 }
 
+// Restauration d'une sauvegarde (fichier JSON fait par le bouton 💾 des réglages). Tout est
+// vérifié : un fichier abîmé ou modifié à la main n'ajoute que ce qui est valable.
+function restorePlaylists(data) {
+  if (data?.app !== "sidetrack" || !Array.isArray(data.playlists)) {
+    notice = { key: "noticeBadBackup" };
+    return update();
+  }
+  let lists = 0;
+  let tracks = 0;
+  for (const raw of data.playlists.slice(0, 500)) {
+    if (!raw || typeof raw !== "object" || !Array.isArray(raw.items)) continue;
+    const items = raw.items
+      .filter((it) => it && typeof it.id === "string" && /^[\w-]{11}$/.test(it.id))
+      .slice(0, 5000)
+      .map((it) => {
+        const item = { id: it.id, title: cleanText(it.title, 300) || it.id };
+        if (Array.isArray(it.chapters)) {
+          item.chapters = it.chapters
+            .filter((c) => c && Number.isFinite(c.start) && c.start >= 0)
+            .map((c) => ({ title: cleanText(c.title, 200), start: Math.floor(c.start) }));
+        }
+        return item;
+      });
+    const name = cleanText(raw.name, 80) || t("defaultPlaylist");
+    // Même playlist (même identifiant) déjà là : son contenu est remplacé par celui du fichier
+    const id = typeof raw.id === "string" && /^[\w-]{1,64}$/.test(raw.id) ? raw.id : null;
+    let p = id && state.playlists.find((x) => x.id === id);
+    if (!p) {
+      p = newPlaylist(name);
+      if (id) p.id = id;
+    }
+    p.name = name;
+    p.items = items;
+    if (typeof raw.preset === "string" && PRESETS[raw.preset]) p.preset = raw.preset;
+    lists++;
+    tracks += items.length;
+  }
+  // La playlist affichée et la musique en cours ne changent pas : les autres sont dans la liste
+  notice = { key: "noticeRestored", args: [lists, tracks] };
+  update();
+  save();
+}
+
 // Playlist toute prête (presets.js) : ajoutée une fois, puis simplement affichée
 function addPreset(key) {
   const preset = PRESETS[key];
@@ -869,6 +912,8 @@ const actions = {
   },
   deletePlaylist,
   addPreset,
+  restorePlaylists,
+  logBackup: (count, file) => log(t("logBackup", count, String(file))),
   addLink,
   removeItem,
   moveItem,
