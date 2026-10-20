@@ -1,4 +1,4 @@
-// addon-kit — traductions communes des extensions Tom-Tour (Sidetrack, Pagemates…).
+// addon-kit — traductions communes des extensions tom-tour (Sidetrack, Pagemates…).
 // Copié dans chaque extension par sync.mjs : ne pas modifier la copie, modifier le kit.
 //
 // À charger AVANT le i18n.js de l'extension, qui déclare `const STRINGS = { fr, en }` avec
