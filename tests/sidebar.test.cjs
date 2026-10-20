@@ -102,10 +102,10 @@ const { read, until, check, done, makeEngine, sidebarFor, playlist } = require("
     const fresh = makeEngine("neuve", {});
     const sf = sidebarFor(fresh);
     fresh.eval("mining = { tries: 3 }; update()");
-    await until(() => sf.$("#mining-text")?.textContent.includes("%"));
+    await until(() => sf.$("#mining-title")?.textContent.includes("%"));
     sf.click("#toggle-room");
     await until(() => !sf.$("#mining").hidden);
-    check("identité en calcul : « Création de ton identité anti-spam… N % »", /Création de ton identité anti-spam… \d+ %/.test(sf.$("#mining-text").textContent), sf.$("#mining-text").textContent);
+    check("identité en calcul : « Création de ton identité anti-spam… N % »", /Création de ton identité anti-spam… \d+ %/.test(sf.$("#mining-title").textContent), sf.$("#mining-title").textContent);
 
     const errs = [...sb.errors, ...sf.errors];
     check("aucune erreur dans la page", !errs.length, errs.join(" / "));

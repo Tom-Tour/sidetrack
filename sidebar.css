@@ -64,7 +64,6 @@ li.loading > .row::after {
 /* --- Salon : deux lignes au-dessus des onglets, puis le chat --- */
 #online { margin-top: 6px; }
 #mining { margin-bottom: 6px; }
-#mining-bar { display: block; width: 100%; height: 6px; margin-top: 4px; accent-color: var(--accent); }
 /* Ligne 1 : le nom prend la place restante, Public et le bouton juste ce qu'il leur faut */
 #room-form { display: flex; align-items: center; gap: 4px; }
 #room-form input[type=text] { flex: 1; min-width: 0; }
@@ -87,8 +86,8 @@ li.loading > .row::after {
 #chat { height: 160px; padding: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); }
 #chat-form { margin-top: 4px; }
 .chat .masked, .chat .private { color: var(--accent); }
-.chat .hint { color: var(--good); border: 1px solid var(--good); border-radius: 10px; padding: 0 5px; margin-left: 4px; font-size: 11px; }
-.chat .ref, .chat .tc { color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 10px; margin: 0 2px; padding: 0 5px; }
+.chat .pill { margin: 0 2px; }
+.chat .ref { color: var(--accent); border-color: var(--accent); } /* référence à un moment, à une vidéo */
 .chat .ref.plain { cursor: default; }
 .chat .yt { color: var(--accent); }
 .chat .msg button { padding: 0 5px; }
@@ -96,13 +95,8 @@ li.loading > .row::after {
 /* --- Blind test --- */
 #blind-status { margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
 #blind-status strong { font-size: 15px; }
-.good { color: var(--good); border-color: var(--good); }
-.bad { color: var(--bad); border-color: var(--bad); }
 #solo-guess { margin-top: 8px; }
 #guess-list { list-style: none; margin: 4px 0 0; padding: 0; }
 #guess-list li { padding: 1px 4px; color: var(--accent); }
 #guess-list li.points { color: var(--good); font-weight: 600; }
 #guest-claim { margin: 4px 0; }
-#blind-settings { margin: 8px 0 0; border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
-#blind-settings label { display: block; margin: 4px 0; }
-#blind-settings label.check { display: flex; gap: 6px; align-items: flex-start; }

@@ -265,7 +265,7 @@ browser.browserAction.onClicked.addListener(() => browser.sidebarAction.toggle()
 function noteMessage() {
   if (ports.size) return;
   unread++;
-  browser.browserAction.setBadgeBackgroundColor({ color: "#0090ff" });
+  browser.browserAction.setBadgeBackgroundColor({ color: BADGE_COLORS.COUNT });
   browser.browserAction.setBadgeText({ text: unread > 99 ? "99+" : String(unread) });
 }
 

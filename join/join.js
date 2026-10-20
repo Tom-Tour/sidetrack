@@ -560,7 +560,7 @@ function renderChat() {
       if (msg.color) name.style.color = msg.color;
       p.append(msg.text ?? "");
       if (msg.ref) {
-        p.append(el("span", `▶ ${cleanText(msg.ref.label, 120) || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, "ref"));
+        p.append(el("span", `▶ ${cleanText(msg.ref.label, 120) || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, "pill ref"));
       }
       return p;
     })

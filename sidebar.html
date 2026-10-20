@@ -34,9 +34,9 @@
     <!-- Salon (bouton 🌐) : créer ou rejoindre, salons publics ; une fois dedans, le chat -->
     <section id="online" hidden>
       <!-- Premier lancement : la preuve de travail de l'identité se calcule une seule fois -->
-      <div id="mining" hidden>
-        <div class="line"><span id="mining-text" class="grow"></span></div>
-        <progress id="mining-bar" max="1" value="0"></progress>
+      <div id="mining" class="notice mining" hidden>
+        <p id="mining-title" class="title"></p>
+        <progress id="mining-bar" max="100"></progress>
         <p class="help" data-i18n="identityMiningHelp"></p>
       </div>
       <form id="room-form">
@@ -139,7 +139,7 @@
         </div>
         <ol id="host-queue"></ol>
       </div>
-      <fieldset id="blind-settings">
+      <fieldset id="blind-settings" class="frame">
         <label><span data-i18n="clipLength"></span>
           <select id="clip">
             <option value="10">10 s</option>

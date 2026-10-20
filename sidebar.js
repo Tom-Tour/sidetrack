@@ -344,11 +344,11 @@ function chatText(parent, text) {
     last = m.index + m[0].length;
     if (m[1]) {
       parent.appendChild(el("span", m[1], "yt"));
-      parent.appendChild(button("＋", () => act("addLink", m[1]), "ref")).title = t("addToPlaylistTitle");
+      parent.appendChild(button("＋", () => act("addLink", m[1]), "pill ref")).title = t("addToPlaylistTitle");
       continue;
     }
     const seconds = (Number(m[2] ?? 0) * 60 + Number(m[3])) * 60 + Number(m[4]);
-    parent.appendChild(button(m[0], () => act("seek", seconds), "tc")).title = t("seekAllTitle");
+    parent.appendChild(button(m[0], () => act("seek", seconds), "pill ref")).title = t("seekAllTitle");
   }
   parent.append(text.slice(last));
 }
@@ -472,10 +472,10 @@ function chatLine(msg, { guest, referee, playing }) {
     else chatText(p, msg.text);
   }
   // Aide à l'arbitrage : la proposition ressemble au titre
-  if (msg.hint) p.appendChild(el("span", t("probable"), "hint")).title = t("probableTitle");
+  if (msg.hint) p.appendChild(el("span", t("probable"), "pill good")).title = t("probableTitle");
   if (msg.ref) {
     const text = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
-    p.append(guest ? el("span", text, "ref plain") : button(text, () => act("playRef", msg.ref), "ref"));
+    p.append(guest ? el("span", text, "pill ref plain") : button(text, () => act("playRef", msg.ref), "pill ref"));
   }
   // Animateur : il donne les points directement depuis une proposition
   if (!guest && referee && msg.from !== "host") p.append(button("+1", () => act("award", msg.from, 1)));
@@ -522,8 +522,8 @@ function renderRoom(blind) {
   $("#mining").hidden = !mining || !!room;
   if (mining) {
     const share = miningShare(mining);
-    $("#mining-text").textContent = t("identityMining", Math.round(100 * share));
-    $("#mining-bar").value = share;
+    $("#mining-title").textContent = t("identityMining", Math.round(100 * share));
+    $("#mining-bar").value = Math.round(100 * share);
   }
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
