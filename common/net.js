@@ -54,13 +54,19 @@ function safeSend(conn, msg) {
   }
 }
 
-// Tout ce qui arrive des autres est nettoyé : texte borné, espaces écrasés
+// Tout ce qui arrive des autres est nettoyé : texte borné, caractères de contrôle remplacés
+// par une espace (sauf le retour à la ligne), caractères invisibles et d'inversion du sens
+// d'écriture retirés (sinon un message pourrait se faire passer pour un autre à l'affichage).
 function cleanText(value, max = LIMITS.TEXT_MAX) {
-  return String(value ?? "").slice(0, max).trim();
+  return String(value ?? "")
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, " ")
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, "")
+    .slice(0, max)
+    .trim();
 }
 
 function cleanName(value, fallback = "?") {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, LIMITS.NAME_MAX) || fallback;
+  return cleanText(value).replace(/\s+/g, " ").slice(0, LIMITS.NAME_MAX).trim() || fallback;
 }
 
 function cleanColor(value, fallback = "#888888") {
