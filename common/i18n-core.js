@@ -21,6 +21,7 @@ const COMMON_STRINGS = {
     langAuto: "Automatique (langue du navigateur)",
     log: "Journal",
     about: "À propos",
+    amoPage: "Fiche sur addons.mozilla.org",
     sourceCode: "Code source sur GitHub",
     support: "Soutenir sur Ko-fi",
     // Actions
@@ -82,6 +83,7 @@ const COMMON_STRINGS = {
     langAuto: "Automatic (browser language)",
     log: "Log",
     about: "About",
+    amoPage: "Page on addons.mozilla.org",
     sourceCode: "Source code on GitHub",
     support: "Support on Ko-fi",
     send: "Send",
