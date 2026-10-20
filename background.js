@@ -20,7 +20,9 @@ let state = {
   mode: "listen",      // "listen" | "blind" | "emcee" (blind test animé par l'hôte d'un salon)
   // startMode : "start" début du morceau | "random" moment aléatoire | "chapter" chapitre aléatoire
   // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
-  blind: { clip: -1, startMode: "chapter", hideVideo: true },
+  // pause : secondes de réponse affichée avant la manche suivante (0 = on enchaîne à la main)
+  // scoring : points de l'animateur, "auto" (comme les joueurs) ou "manual" (il les donne)
+  blind: { clip: -1, startMode: "chapter", hideVideo: true, pause: 10, scoring: "auto" },
   blindDefaults: 2,    // version des réglages par défaut du blind test (voir le démarrage)
   volume: 100,
   lang: "auto",        // "auto" | "fr" | "en"
@@ -640,11 +642,15 @@ function shuffle(a) {
 // (0 = morceau entier, null = inconnue tant que la vidéo n'a pas démarré)
 function resetGame() {
   clearInterval(gameTimer);
-  game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0, clip: 0, chapter: null };
+  game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 0, clip: 0, chapter: null, nextIn: 0 };
 }
+
+// Temps écoulé : quelques secondes pour les réponses de dernière seconde, puis la réponse
+const TIMEUP_GRACE = 3000;
 
 async function startGame() {
   resetGame();
+  resetScores(); // nouvelle partie dans un salon : tout le monde repart de zéro (room.js)
   let rounds = items().map((_, i) => ({ i }));
   if (state.blind.startMode === "chapter") {
     // Une manche par chapitre ; une vidéo sans chapitres reste une seule manche
@@ -728,18 +734,36 @@ function timeUp() {
   game.remaining = 0;
   game.phase = "timeup";
   send({ action: "pause" });
+  // Partie automatique : la réponse suit d'elle-même
+  if (state.blind.pause > 0) gameTimer = setTimeout(reveal, TIMEUP_GRACE);
   update();
 }
 
 function reveal() {
+  if (game.phase !== "playing" && game.phase !== "timeup") return;
   clearInterval(gameTimer);
   game.phase = "revealed";
+  game.answered = false;
   unmaskGuesses();
+  autoScore();
   send({ action: "play" });
+  // Partie automatique : la manche suivante part après la pause réglée
+  game.nextIn = state.blind.pause > 0 ? state.blind.pause : 0;
+  if (game.nextIn) {
+    gameTimer = setInterval(() => {
+      game.nextIn--;
+      if (game.nextIn > 0) return update();
+      // Seul, sans réponse donnée : la manche compte comme ratée
+      if (!room) answer(false);
+      else nextRound();
+    }, 1000);
+  }
   update();
 }
 
 function answer(found) {
+  if (game.phase !== "revealed" || game.answered) return;
+  game.answered = true;
   if (found) game.score++;
   game.played++;
   nextRound();
@@ -821,6 +845,8 @@ const actions = {
     state.blind[key] = value;
     // « Durée du chapitre » n'a de sens qu'avec un départ par chapitre
     if (key === "startMode" && value !== "chapter" && state.blind.clip === -1) state.blind.clip = 20;
+    if (key === "pause") state.blind.pause = Math.max(0, Math.min(60, Number(value) || 0));
+    if (key === "scoring") state.blind.scoring = value === "manual" ? "manual" : "auto";
     update();
     save();
   },

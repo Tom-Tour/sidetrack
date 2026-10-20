@@ -211,6 +211,8 @@ $("#chat-secret").addEventListener("click", () => {
 $("#clip").addEventListener("change", (e) => act("setBlind", "clip", Number(e.target.value)));
 $("#startMode").addEventListener("change", (e) => act("setBlind", "startMode", e.target.value));
 $("#hideVideo").addEventListener("change", (e) => act("setBlind", "hideVideo", e.target.checked));
+$("#pause").addEventListener("change", (e) => act("setBlind", "pause", Number(e.target.value)));
+$("#scoring").addEventListener("change", (e) => act("setBlind", "scoring", e.target.value));
 
 // --- Affichage -------------------------------------------------------------
 
@@ -382,7 +384,14 @@ function renderRoom(blind) {
 
   // Pastilles des joueurs : couleur, score ; l'hôte peut, au survol, exclure ou bannir
   const scores = guest ? !!guest.host?.blind : true;
+  const hostScore = guest ? guest.host?.hostScore : view.state.mode === "blind" ? room.hostScore : null;
+  const hostChip = () => {
+    const li = el("li", null, guest ? "" : "me");
+    li.append(el("span", t("host")), el("b", String(hostScore)));
+    return li;
+  };
   $("#room-players").replaceChildren(
+    ...(hostScore != null ? [hostChip()] : []),
     ...room.players.map((p) => {
       const li = el("li", null, p.id === me ? "me" : "");
       const name = li.appendChild(el("span", p.name));
@@ -401,7 +410,8 @@ function renderRoom(blind) {
   const chat = $("#chat");
   const atBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 20;
   const playing = !guest && view.state.mode === "blind";
-  chat.replaceChildren(...room.chat.map((msg) => chatLine(msg, { guest: !!guest, blind, playing })));
+  const referee = !guest && view.state.mode === "emcee";
+  chat.replaceChildren(...room.chat.map((msg) => chatLine(msg, { guest: !!guest, blind: referee, playing })));
 
   // Bouton 🔒/💬 devant le champ : en blind test, pour les joueurs (pas pour l'animateur)
   const plays = guest ? !!guest.host?.blind : playing;
@@ -436,7 +446,7 @@ function renderGuest(g) {
         loading: t("blindLoading"),
         playing: t("blindPlaying"),
         timeup: t("timeUpBang"),
-        revealed: t("blindRevealed", blind.answer ?? "?"),
+        revealed: t("blindRevealed", blind.answer ?? "?") + (blind.nextIn ? ` · ${t("nextIn", blind.nextIn)}` : ""),
         over: t("gameOver"),
       }[blind.phase] ?? "";
   $("#guest-status").textContent = blind?.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
@@ -479,7 +489,8 @@ function renderBlind(game, n, multi, room = multi) {
   const status = $("#blind-status");
   const actions = $("#blind-actions");
   const total = game.order.length;
-  const round = multi
+  // Score « x/y » en solo seulement : dans un salon, les points s'affichent sur les pastilles
+  const round = room
     ? t("round", game.pos + 1, total)
     : `${t("round", game.pos + 1, total)} · ${t("score", game.score, game.played)}`;
 
@@ -507,20 +518,25 @@ function renderBlind(game, n, multi, room = multi) {
         ...(multi ? [playPause(), button(t("reveal"), () => act("reveal")), button(t("skip"), () => act("nextRound"))] : [button(t("reveal"), () => act("reveal"))])
       );
       break;
-    case "revealed":
-      status.textContent = multi ? `${round} · ${t("givePoints")}` : round;
+    case "revealed": {
+      const manual = multi && view.state.blind.scoring === "manual";
+      const next = game.nextIn ? ` · ${t("nextIn", game.nextIn)}` : "";
+      status.textContent = `${round}${manual ? ` · ${t("givePoints")}` : room ? ` · ${t("autoPoints")}` : ""}${next}`;
       actions.replaceChildren(
         ...(multi
           ? [playPause(), button(t("nextRound"), () => act("nextRound"))]
-          : [
+          : room
+            ? [button(t("nextRound"), () => act("nextRound"))]
+            : [
               button(t("found"), () => act("answer", true), "good"),
               button(t("missed"), () => act("answer", false), "bad"),
             ])
       );
       break;
+    }
     case "over":
       status.textContent = t("gameOver");
-      if (!multi) {
+      if (!room) {
         status.append(" : ");
         status.appendChild(el("strong", `${game.score}/${game.played}`));
       }
@@ -706,6 +722,9 @@ function render() {
   if (document.activeElement !== $("#clip")) $("#clip").value = String(state.blind.clip);
   if (document.activeElement !== $("#startMode")) $("#startMode").value = state.blind.startMode;
   $("#hideVideo").checked = state.blind.hideVideo;
+  if (document.activeElement !== $("#pause")) $("#pause").value = String(state.blind.pause ?? 10);
+  if (document.activeElement !== $("#scoring")) $("#scoring").value = state.blind.scoring ?? "auto";
+  $("#scoring-row").hidden = !referee;
 
   $("#host-tracks").hidden = !referee;
   if (referee) renderHostTracks(game);

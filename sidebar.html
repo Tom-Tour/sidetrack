@@ -121,6 +121,23 @@
           </select>
         </label>
         <label><input type="checkbox" id="hideVideo"> <span id="hideVideo-label"></span></label>
+        <label><span data-i18n="pause"></span>
+          <select id="pause">
+            <option value="0" data-i18n="pauseManual"></option>
+            <option value="5">5 s</option>
+            <option value="10">10 s</option>
+            <option value="15">15 s</option>
+            <option value="20">20 s</option>
+            <option value="30">30 s</option>
+          </select>
+        </label>
+        <!-- Animateur seulement -->
+        <label id="scoring-row" hidden><span data-i18n="scoring"></span>
+          <select id="scoring">
+            <option value="auto" data-i18n="scoringAuto"></option>
+            <option value="manual" data-i18n="scoringManual"></option>
+          </select>
+        </label>
       </fieldset>
       <!-- Hôte d'un salon : liste des pistes, clic = prochaine manche -->
       <div id="host-tracks" hidden>

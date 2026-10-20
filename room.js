@@ -483,6 +483,7 @@ function addChat({ secret = true, ...entry }) {
     id: ++chatSeq,
     at: Date.now(),
     private: player && secret && guessing(),
+    round: player && guessing() ? game.pos : null, // proposition de cette manche (points automatiques)
     hint: fromGuest && guessHint(entry.text), // jamais envoyé aux invités
   };
   room.chat.push(msg);
@@ -520,10 +521,41 @@ function unmaskGuesses() {
 }
 
 function award(playerId, delta = 1) {
-  const p = room?.players.get(playerId);
+  if (!room) return;
+  // L'hôte qui joue (onglet Blind test) a aussi un score
+  if (playerId === "host") {
+    room.hostScore = (room.hostScore ?? 0) + delta;
+    return systemMessage(delta > 0 ? "chatPointPlus" : "chatPointMinus", delta, t("host"), room.hostScore);
+  }
+  const p = room.players.get(playerId);
   if (!p) return;
   p.score += delta;
   systemMessage(delta > 0 ? "chatPointPlus" : "chatPointMinus", delta, p.name, p.score);
+}
+
+function resetScores() {
+  if (!room) return;
+  room.hostScore = 0;
+  for (const p of room.players.values()) p.score = 0;
+  update();
+}
+
+// À la révélation : un point pour chaque joueur dont une proposition de la manche est assez
+// proche du titre (ou du chapitre), selon les mêmes règles que l'indice « probable ».
+// L'animateur peut préférer donner les points lui-même (réglage « Points »).
+function autoScore() {
+  if (!room || (state.mode === "emcee" && state.blind.scoring === "manual")) return;
+  const item = items()[state.index];
+  if (!item) return;
+  const parts = answerParts(game.chapter?.title, game.chapter ? null : item.title);
+  const found = new Set();
+  for (const msg of room.chat) {
+    if (msg.round !== game.pos || !msg.text || found.has(msg.from)) continue;
+    if (state.mode === "emcee" && msg.from === "host") continue; // l'animateur ne joue pas
+    if (looksRight(msg.text, parts)) found.add(msg.from);
+  }
+  if (!found.size) return systemMessage("chatNobody");
+  for (const id of found) award(id, 1);
 }
 
 // --- État partagé avec les invités -------------------------------------------
@@ -559,7 +591,10 @@ function publicState() {
           clip: game.clip,
           hideVideo: state.blind.hideVideo,
           answer: game.phase === "revealed" ? currentAnswer() : null,
+          nextIn: game.phase === "revealed" ? game.nextIn : 0,
         },
+    // L'hôte joue lui aussi : son score s'affiche avec ceux des invités
+    hostScore: state.mode === "blind" ? room.hostScore ?? 0 : null,
   };
 }
 
@@ -596,6 +631,7 @@ function roomSnapshot() {
     status: room.status,
     public: room.public,
     players: playerList(),
+    hostScore: room.hostScore ?? 0,
     chat: room.chat,
   };
 }

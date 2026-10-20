@@ -48,6 +48,8 @@ const STRINGS = {
     chatFlood: "{0} envoie trop de messages : sourdine pendant 1 minute",
     chatKicked: "{0} a été exclu du salon",
     chatBanned: "{0} a été banni",
+    chatNobody: "Personne n'a trouvé cette fois",
+    nextIn: "suite dans {0} s",
     preparing: "Préparation de ton identité anti-spam (une seule fois)…",
     full: "Ce salon est complet (24 joueurs).",
     kicked: "L'hôte t'a exclu du salon.",
@@ -100,6 +102,8 @@ const STRINGS = {
     chatFlood: "{0} is sending too many messages: muted for 1 minute",
     chatKicked: "{0} was kicked from the room",
     chatBanned: "{0} was banned",
+    chatNobody: "Nobody got it this time",
+    nextIn: "next in {0} s",
     preparing: "Preparing your anti-spam identity (only once)…",
     full: "This room is full (24 players).",
     kicked: "The host kicked you from the room.",
@@ -602,7 +606,11 @@ function renderQueue() {
 
 function render() {
   renderSecret();
+  // L'hôte joue lui aussi : son score avec les nôtres
+  const host = room.hostScore != null ? [el("li", t("host"))] : [];
+  if (host.length) host[0].append(el("b", String(room.hostScore)));
   $("#players").replaceChildren(
+    ...host,
     ...room.players.map((p) => {
       const li = el("li", p.name, p.id === me ? "me" : "");
       li.style.color = p.color;
@@ -633,7 +641,7 @@ function render() {
     loading: t("blindLoading"),
     playing: t("blindPlaying"),
     timeup: t("blindTimeup"),
-    revealed: t("blindRevealed", blind.answer ?? "?"),
+    revealed: t("blindRevealed", blind.answer ?? "?") + (blind.nextIn ? ` · ${t("nextIn", blind.nextIn)}` : ""),
     over: t("blindOver"),
   }[blind.phase];
   $("#blind-status").textContent = blind.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
