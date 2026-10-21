@@ -199,8 +199,22 @@ function listedRoom() {
   return view?.rooms.list.find((r) => r.code === name);
 }
 
+// Premier salon : le pseudo tapé est gardé ; sans rien taper, le pseudo par défaut est accepté
+function commitName() {
+  if (view.settings.nameSet) return;
+  const name = $("#ask-name").value.trim();
+  if (name) act("setSetting", "nickname", name);
+  else act("setSetting", "nameSet", true);
+}
+$("#ask-name").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  $("#room-form").requestSubmit();
+});
+
 $("#room-form").addEventListener("submit", (e) => {
   e.preventDefault();
+  commitName();
   const name = roomName($("#room-name").value) || suggestName();
   if (listedRoom()) act("joinRoom", name);
   else act("openRoom", { name, isPublic: $("#room-public").checked });
@@ -368,7 +382,10 @@ function renderPublicRooms() {
       li.title = t("join");
       const name = `${r.mode === "blind" ? "❓" : "🎵"} ${r.code}${r.game ? ` · ${t("gameInProgress")}` : ""}`;
       li.append(el("span", name, "name"), el("span", `${r.players} 👤`, "muted"));
-      li.addEventListener("click", () => act("joinRoom", r.code));
+      li.addEventListener("click", () => {
+        commitName();
+        act("joinRoom", r.code);
+      });
       return li;
     })
   );
@@ -537,6 +554,8 @@ function renderRoom(blind) {
   }
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
+  $("#name-ask").hidden = !!room || view.settings.nameSet;
+  $("#ask-name").placeholder = t("defaultName");
   $("#rooms-row").hidden = !!room;
   $("#public-list").hidden = !!room;
   if (!room) {

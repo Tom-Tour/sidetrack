@@ -22,6 +22,7 @@ const DEFAULTS = {
   showPresets: true,   // bouton 📚 des playlists toutes prêtes
   hideTab: true,       // ranger l'onglet du lecteur hors de la barre d'onglets (tabs.hide)
   nickname: "",        // pseudo dans les salons
+  nameSet: false,      // pseudo choisi ou accepté (sinon proposé avant le premier salon)
   volume: 100,
   // startMode : "start" début du morceau | "random" moment aléatoire | "chapter" chapitre aléatoire
   // clip : secondes d'extrait, 0 = morceau entier, -1 = durée du chapitre
@@ -47,6 +48,7 @@ function cleanSetting(key, value) {
     case "showMulti":
     case "showPresets":
     case "hideTab":
+    case "nameSet":
       return bool(value);
     case "nickname":
       return typeof value === "string" ? cleanName(value, "") : undefined;
@@ -82,6 +84,7 @@ function loadSettings(raw = {}) {
     const value = cleanSetting(key, raw[key]);
     if (value !== undefined) out[key] = value;
   }
+  if (out.nickname) out.nameSet = true; // pseudo déjà choisi avant l'ajout de nameSet
   for (const key of Object.keys(DEFAULTS.blind)) {
     const value = cleanBlind(key, raw.blind?.[key]);
     if (value !== undefined) out.blind[key] = value;
@@ -1172,10 +1175,11 @@ const actions = {
     save();
   },
   setSetting: (key, value) => {
-    if (!["lang", "showMulti", "chatSound", "nickname", "hideTab", "showPresets"].includes(key)) return;
+    if (!["lang", "showMulti", "chatSound", "nickname", "nameSet", "hideTab", "showPresets"].includes(key)) return;
     const clean = cleanSetting(key, value);
     if (clean === undefined) return;
     settings[key] = clean;
+    if (key === "nickname") settings.nameSet = true;
     if (key === "hideTab") applyHideTab();
     if (key === "lang") setLang(clean);
     update();

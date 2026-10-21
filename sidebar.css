@@ -64,6 +64,8 @@ li.loading > .row::after {
 /* --- Salon : deux lignes au-dessus des onglets, puis le chat --- */
 #online { margin-top: 6px; }
 #mining { margin-bottom: 6px; }
+/* Premier salon : le pseudo, au-dessus de la ligne 1 */
+#name-ask { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
 /* Ligne 1 : le nom prend la place restante, Public et le bouton juste ce qu'il leur faut */
 #room-form { display: flex; align-items: center; gap: 4px; }
 #room-form input[type=text] { flex: 1; min-width: 0; }

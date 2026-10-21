@@ -143,7 +143,25 @@ const { read, until, check, done, makeEngine, sidebarFor, playlist } = require("
     await until(() => !sf.$("#mining").hidden);
     check("identité en calcul : « Création de l'identité anti-spam… N % »", /Création de l'identité anti-spam… \d+ %/.test(sf.$("#mining-title").textContent), sf.$("#mining-title").textContent);
 
-    const errs = [...sb.errors, ...sf.errors];
+    // --- Premier salon : choix du pseudo ---
+    check("pseudo déjà choisi : rien n'est proposé", bob.snap().settings.nameSet === true);
+    check("sans pseudo : proposé au-dessus du salon", !sf.$("#name-ask").hidden && sf.$("#name-ask").textContent.startsWith("Pseudo dans les salons") && sf.$("#ask-name").placeholder === "Invité");
+    sf.$("#ask-name").value = "Zoé";
+    sf.$("#room-form").requestSubmit();
+    await until(() => fresh.snap().settings.nameSet);
+    check("créer un salon garde le pseudo tapé", fresh.snap().settings.nickname === "Zoé");
+    await until(() => sf.$("#name-ask").hidden);
+    check("plus proposé ensuite", sf.$("#name-ask").hidden);
+    const quiet = makeEngine("calme", {});
+    const sq = sidebarFor(quiet);
+    await until(() => quiet.snap()?.me.code);
+    sq.click("#toggle-room");
+    await until(() => !sq.$("#name-ask").hidden);
+    sq.$("#room-form").requestSubmit();
+    await until(() => quiet.snap().settings.nameSet);
+    check("sans rien taper : le pseudo par défaut est accepté", quiet.snap().settings.nickname === "" && quiet.snap().settings.nameSet);
+
+    const errs = [...sb.errors, ...sf.errors, ...sq.errors];
     check("aucune erreur dans la page", !errs.length, errs.join(" / "));
   } catch (err) {
     check("exception", false, err.stack);
