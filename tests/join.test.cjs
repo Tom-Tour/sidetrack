@@ -18,10 +18,10 @@ const { read, until, check, done, makeEngine, joinPage, playlist, FakeWorker } =
     const alice = joinPage("invites");
     await until(() => /^[0-9A-F]{4}$/.test(alice.$(".my-code").textContent), 10000);
     const codeAlice = alice.$(".my-code").textContent;
-    check("ton code affiché sur l'écran de connexion", /^[0-9A-F]{4}$/.test(codeAlice));
+    check("code d'identité affiché sur l'écran de connexion", /^[0-9A-F]{4}$/.test(codeAlice));
     const saved = JSON.parse(alice.win.localStorage.getItem("sidetrack-pow-v2"));
     check("preuve gardée au format du kit", saved.v === 2 && saved.code === codeAlice);
-    check("textes communs du kit (Rejoindre, Pseudo, Ton code)", alice.$("#login-form button").textContent === "Rejoindre" && alice.$("#login").textContent.includes("Pseudo") && alice.$("#login").textContent.includes("Ton code"));
+    check("textes communs du kit (Rejoindre, Pseudo, Code d'identité)", alice.$("#login-form button").textContent === "Rejoindre" && alice.$("#login").textContent.includes("Pseudo") && alice.$("#login").textContent.includes("Code d'identité"));
 
     alice.join("Alice");
     await until(() => !alice.$("#room").hidden && host.snap().room.players.some((p) => p.name === "Alice"), 5000);
@@ -55,7 +55,7 @@ const { read, until, check, done, makeEngine, joinPage, playlist, FakeWorker } =
     const aliceId = host.snap().room.players.find((p) => p.name === "Alice").id;
     host.act("ban", aliceId);
     await until(() => alice.$("#room-status").textContent.includes("banni"), 3000);
-    check("bannie : « L'hôte t'a banni de ses salons. »", alice.$("#room-status").textContent === "L'hôte t'a banni de ses salons.");
+    check("bannie : « Banni des salons de cet hôte. »", alice.$("#room-status").textContent === "Banni des salons de cet hôte.");
     check("messages du système traduits (clés sys*)", alice.chat().some((t) => t === "Alice a rejoint le salon"));
 
     // --- Langue ---

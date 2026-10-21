@@ -46,9 +46,9 @@ const COMMON_STRINGS = {
     // Identité
     nickname: "Pseudo",
     defaultName: "Invité",
-    codeLabel: "Ton code",
-    codeHelp: "Ce code accompagne ton nom partout. Il est lié à ton identité : quelqu'un qui prend ton pseudo n'aura pas le même code.",
-    identityMining: "Création de ton identité anti-spam… {0} %",
+    codeLabel: "Code d'identité",
+    codeHelp: "Ce code accompagne le pseudo partout. Il est lié à l'identité : quelqu'un qui reprend le même pseudo n'aura pas le même code.",
+    identityMining: "Création de l'identité anti-spam… {0} %",
     identityMiningHelp: "Une seule fois, une vingtaine de secondes : ce petit calcul rend les faux comptes coûteux, pour que les blocages tiennent.",
     ipNotice: "Les personnes d'un salon sont connectées directement entre elles (pair-à-pair) : chacun peut voir l'adresse IP des autres.",
     // Protection

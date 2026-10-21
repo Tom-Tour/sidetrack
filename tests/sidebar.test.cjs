@@ -141,7 +141,7 @@ const { read, until, check, done, makeEngine, sidebarFor, playlist } = require("
     await until(() => sf.$("#mining-title")?.textContent.includes("%"));
     sf.click("#toggle-room");
     await until(() => !sf.$("#mining").hidden);
-    check("identité en calcul : « Création de ton identité anti-spam… N % »", /Création de ton identité anti-spam… \d+ %/.test(sf.$("#mining-title").textContent), sf.$("#mining-title").textContent);
+    check("identité en calcul : « Création de l'identité anti-spam… N % »", /Création de l'identité anti-spam… \d+ %/.test(sf.$("#mining-title").textContent), sf.$("#mining-title").textContent);
 
     const errs = [...sb.errors, ...sf.errors];
     check("aucune erreur dans la page", !errs.length, errs.join(" / "));

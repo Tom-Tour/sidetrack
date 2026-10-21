@@ -26,10 +26,10 @@ const cover = document.getElementById("cover");
 const STRINGS = {
   fr: {
     setupTitle: "Sidetrack est presque prêt",
-    setupClick: "Clique sur « Lancer Sidetrack » : Firefox n'active le son qu'après un clic. L'onglet se range ensuite tout seul.",
-    setupHide: "Une petite bulle peut s'afficher en haut à droite de Firefox (« Une extension masque certains de vos onglets ») : clique sur « Garder les onglets masqués ». Tu retrouves l'onglet avec 📺 dans le panneau.",
+    setupClick: "Cliquer sur « Lancer Sidetrack » : Firefox n'active le son qu'après un clic. L'onglet se range ensuite tout seul.",
+    setupHide: "Une petite bulle peut s'afficher en haut à droite de Firefox (« Une extension masque certains de vos onglets ») : cliquer sur « Garder les onglets masqués ». L'onglet se retrouve ensuite avec 📺 dans le panneau.",
     unlock: "🔊 Lancer Sidetrack",
-    orphan: "Sidetrack n'est plus actif : tu peux fermer cet onglet.",
+    orphan: "Sidetrack n'est plus actif : cet onglet peut être fermé.",
   },
   en: {
     setupTitle: "Sidetrack is almost ready",
