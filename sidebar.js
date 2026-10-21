@@ -199,17 +199,18 @@ function listedRoom() {
   return view?.rooms.list.find((r) => r.code === name);
 }
 
-// Premier salon : le pseudo tapé est gardé ; sans rien taper, le pseudo par défaut est accepté
+// Premier salon : le pseudo de la ligne (pré-remplie) est gardé, avec OK ou en entrant dans
+// un salon ; garder « Invité » revient à accepter le pseudo par défaut
 function commitName() {
   if (view.settings.nameSet) return;
   const name = $("#ask-name").value.trim();
-  if (name) act("setSetting", "nickname", name);
+  if (name && name !== t("defaultName")) act("setSetting", "nickname", name);
   else act("setSetting", "nameSet", true);
 }
-$("#ask-name").addEventListener("keydown", (e) => {
-  if (e.key !== "Enter") return;
+$("#name-ask").addEventListener("submit", (e) => {
   e.preventDefault();
-  $("#room-form").requestSubmit();
+  commitName();
+  $("#room-name").focus();
 });
 
 $("#room-form").addEventListener("submit", (e) => {
@@ -555,7 +556,7 @@ function renderRoom(blind) {
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
   $("#name-ask").hidden = !!room || view.settings.nameSet;
-  $("#ask-name").placeholder = t("defaultName");
+  if (document.activeElement !== $("#ask-name")) $("#ask-name").value = view.settings.nickname || t("defaultName");
   $("#rooms-row").hidden = !!room;
   $("#public-list").hidden = !!room;
   if (!room) {

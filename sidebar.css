@@ -65,7 +65,9 @@ li.loading > .row::after {
 #online { margin-top: 6px; }
 #mining { margin-bottom: 6px; }
 /* Premier salon : le pseudo, au-dessus de la ligne 1 */
-#name-ask { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+#name-ask { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+#name-ask label { color: var(--muted); }
+#name-ask input { flex: 1; min-width: 0; }
 /* Ligne 1 : le nom prend la place restante, Public et le bouton juste ce qu'il leur faut */
 #room-form { display: flex; align-items: center; gap: 4px; }
 #room-form input[type=text] { flex: 1; min-width: 0; }

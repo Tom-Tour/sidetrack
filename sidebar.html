@@ -40,8 +40,11 @@
         <p class="help" data-i18n="identityMiningHelp"></p>
       </div>
       <!-- Premier salon : choix du pseudo, tant qu'il n'a été ni choisi ni accepté -->
-      <label id="name-ask" hidden><span data-i18n="nameAsk"></span>
-        <input id="ask-name" type="text" maxlength="24" autocomplete="off"></label>
+      <form id="name-ask" data-i18n-title="nameAsk" hidden>
+        <label for="ask-name" data-i18n="nickname"></label>
+        <input id="ask-name" type="text" maxlength="24" autocomplete="off">
+        <button data-i18n="nameOk"></button>
+      </form>
       <form id="room-form">
         <input id="room-name" type="text" data-i18n-placeholder="roomName" maxlength="24" autocomplete="off">
         <label data-i18n-title="publicRoomTitle"><input type="checkbox" id="room-public"> <span data-i18n="public"></span></label>

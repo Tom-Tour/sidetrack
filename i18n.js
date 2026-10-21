@@ -147,7 +147,8 @@ const STRINGS = {
     backupSave: "💾 Sauvegarder",
     backupRestore: "📂 Restaurer…",
     nicknameHelp: "C'est le nom que voient les autres dans les salons.",
-    nameAsk: "Pseudo dans les salons (modifiable plus tard dans les réglages) :",
+    nameAsk: "Pseudo dans les salons, modifiable plus tard dans les réglages",
+    nameOk: "OK",
 
     // Messages système du chat (envoyés comme clés : chacun les lit dans sa langue)
     sysJoined: "{0} a rejoint le salon",
@@ -368,7 +369,8 @@ const STRINGS = {
     backupSave: "💾 Save",
     backupRestore: "📂 Restore…",
     nicknameHelp: "This is the name others see in rooms.",
-    nameAsk: "Nickname in rooms (you can change it later in the settings):",
+    nameAsk: "Nickname in rooms, which you can change later in the settings",
+    nameOk: "OK",
 
     sysJoined: "{0} joined the room",
     sysLeft: "{0} left",
