@@ -199,12 +199,12 @@ function listedRoom() {
   return view?.rooms.list.find((r) => r.code === name);
 }
 
-// Premier salon : le pseudo de la ligne (pré-remplie) est gardé, avec OK ou en entrant dans
-// un salon ; garder « Invité » revient à accepter le pseudo par défaut
+// Premier salon : le pseudo de la ligne (pré-remplie avec celui proposé) est gardé, avec OK
+// ou en entrant dans un salon
 function commitName() {
   if (view.settings.nameSet) return;
   const name = $("#ask-name").value.trim();
-  if (name && name !== t("defaultName")) act("setSetting", "nickname", name);
+  if (name && name !== view.settings.nickname) act("setSetting", "nickname", name);
   else act("setSetting", "nameSet", true);
 }
 $("#name-ask").addEventListener("submit", (e) => {
@@ -556,7 +556,7 @@ function renderRoom(blind) {
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
   $("#name-ask").hidden = !!room || view.settings.nameSet;
-  if (document.activeElement !== $("#ask-name")) $("#ask-name").value = view.settings.nickname || t("defaultName");
+  if (document.activeElement !== $("#ask-name")) $("#ask-name").value = view.settings.nickname;
   $("#rooms-row").hidden = !!room;
   $("#public-list").hidden = !!room;
   if (!room) {

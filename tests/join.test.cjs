@@ -23,6 +23,7 @@ const { read, until, check, done, makeEngine, joinPage, playlist, FakeWorker } =
     check("preuve gardée au format du kit", saved.v === 2 && saved.code === codeAlice);
     check("textes communs du kit (Rejoindre, Pseudo, Code d'identité)", alice.$("#login-form button").textContent === "Rejoindre" && alice.$("#login").textContent.includes("Pseudo") && alice.$("#login").textContent.includes("Code d'identité"));
 
+    check("pseudo proposé « Invité-1234 », comme dans l'extension", /^Invité-\d{4}$/.test(alice.$("#name").value), alice.$("#name").value);
     alice.join("Alice");
     await until(() => !alice.$("#room").hidden && host.snap().room.players.some((p) => p.name === "Alice"), 5000);
     check("Alice entre dans le salon", !alice.$("#room").hidden && host.snap().room.players.some((p) => p.name === "Alice" && p.code === codeAlice));

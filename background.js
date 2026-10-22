@@ -84,7 +84,8 @@ function loadSettings(raw = {}) {
     const value = cleanSetting(key, raw[key]);
     if (value !== undefined) out[key] = value;
   }
-  if (out.nickname) out.nameSet = true; // pseudo déjà choisi avant l'ajout de nameSet
+  // Pseudo déjà changé avant l'ajout de nameSet (pas celui proposé, « Invité-1234 ») : choisi
+  if (out.nickname && !/^(Invité|Guest)-\d{4}$/.test(out.nickname)) out.nameSet = true;
   for (const key of Object.keys(DEFAULTS.blind)) {
     const value = cleanBlind(key, raw.blind?.[key]);
     if (value !== undefined) out.blind[key] = value;
@@ -1179,7 +1180,10 @@ const actions = {
     const clean = cleanSetting(key, value);
     if (clean === undefined) return;
     settings[key] = clean;
-    if (key === "nickname") settings.nameSet = true;
+    if (key === "nickname") {
+      settings.nameSet = true;
+      if (!clean) settings.nickname = proposedName(); // champ vidé : un nouveau pseudo proposé
+    }
     if (key === "hideTab") applyHideTab();
     if (key === "lang") setLang(clean);
     update();
@@ -1193,6 +1197,11 @@ const actions = {
 
 // --- Démarrage -------------------------------------------------------------
 
+// Pseudo proposé tant qu'aucun n'a été choisi, comme dans Pagemates : « Invité-1234 »
+function proposedName() {
+  return `${t("defaultName")}-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
 async function init() {
   const stored = await browser.storage.local.get(["sidetrack", "settings", "identity", "pow"]);
   const data = stored.sidetrack ?? {};
@@ -1203,6 +1212,7 @@ async function init() {
   state.shuffle = data.shuffle === true;
   state.mode = data.mode === "blind" ? "blind" : "listen"; // pas de salon au démarrage
   setLang(settings.lang);
+  if (!settings.nickname) settings.nickname = proposedName();
   if (!state.playlists.length) newPlaylist(t("defaultPlaylist"));
   if (!playlist()) state.current = state.playlists[0].id;
   state.index = -1;

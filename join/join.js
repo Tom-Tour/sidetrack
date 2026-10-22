@@ -281,8 +281,9 @@ function roomName(text) {
 }
 
 $("#code").value = decodeURIComponent(location.hash.slice(1));
-$("#name").value = store("sidetrack-name") ?? "";
-if ($("#code").value) $("#name").focus();
+// Pseudo proposé comme dans l'extension (« Invité-1234 »), sélectionné pour être remplacé d'un geste
+$("#name").value = store("sidetrack-name") ?? `${t("defaultName")}-${Math.floor(1000 + Math.random() * 9000)}`;
+if ($("#code").value) $("#name").select();
 
 $("#login-form").addEventListener("submit", (e) => {
   e.preventDefault();

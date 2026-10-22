@@ -145,13 +145,17 @@ const { read, until, check, done, makeEngine, sidebarFor, playlist } = require("
 
     // --- Premier salon : choix du pseudo ---
     check("pseudo déjà choisi : rien n'est proposé", bob.snap().settings.nameSet === true);
-    check("sans pseudo : proposé au-dessus du salon", !sf.$("#name-ask").hidden && sf.$("#name-ask label").textContent === "Pseudo" && sf.$("#ask-name").value === "Invité" && sf.$("#name-ask button").textContent === "OK");
+    await until(() => fresh.snap()?.settings.nickname && sf.$("#ask-name").value);
+    check("sans pseudo : proposé au-dessus du salon", !sf.$("#name-ask").hidden && sf.$("#name-ask label").textContent === "Pseudo" && /^Invité-\d{4}$/.test(sf.$("#ask-name").value) && sf.$("#ask-name").value === fresh.snap().settings.nickname && sf.$("#name-ask button").textContent === "OK");
     sf.$("#ask-name").value = "Zoé";
     sf.$("#name-ask").requestSubmit();
     await until(() => fresh.snap().settings.nameSet);
     check("OK garde le pseudo tapé", fresh.snap().settings.nickname === "Zoé");
     await until(() => sf.$("#name-ask").hidden);
     check("plus proposé ensuite", sf.$("#name-ask").hidden);
+    const legacy = makeEngine("ancien", { settings: { nickname: "Invité-1234" } });
+    await until(() => legacy.snap()?.settings.nickname);
+    check("pseudo proposé d'avant : toujours proposé", legacy.snap().settings.nameSet === false && legacy.snap().settings.nickname === "Invité-1234");
     const quiet = makeEngine("calme", {});
     const sq = sidebarFor(quiet);
     await until(() => quiet.snap()?.me.code);
@@ -159,7 +163,7 @@ const { read, until, check, done, makeEngine, sidebarFor, playlist } = require("
     await until(() => !sq.$("#name-ask").hidden);
     sq.$("#room-form").requestSubmit();
     await until(() => quiet.snap().settings.nameSet);
-    check("entrer dans un salon sans y toucher : « Invité » accepté", quiet.snap().settings.nickname === "" && quiet.snap().settings.nameSet);
+    check("entrer dans un salon sans y toucher : « Invité-1234 » accepté", /^Invité-\d{4}$/.test(quiet.snap().settings.nickname) && quiet.snap().settings.nameSet);
 
     const errs = [...sb.errors, ...sf.errors, ...sq.errors];
     check("aucune erreur dans la page", !errs.length, errs.join(" / "));
