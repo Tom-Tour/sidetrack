@@ -27,6 +27,7 @@ const COMMON_STRINGS = {
     // Actions
     send: "Envoyer",
     cancel: "Annuler",
+    ok: "OK",
     close: "Fermer",
     sure: "Sûr ?",
     yes: "Oui",
@@ -45,15 +46,20 @@ const COMMON_STRINGS = {
     chatSound: "Son à chaque nouveau message",
     // Identité
     nickname: "Pseudo",
+    nameAsk: "Pseudo affiché dans les salons, modifiable plus tard dans les réglages",
     defaultName: "Invité",
     codeLabel: "Code d'identité",
     codeHelp: "Ce code accompagne le pseudo partout. Il est lié à l'identité : quelqu'un qui reprend le même pseudo n'aura pas le même code.",
     identityMining: "Création de l'identité anti-spam… {0} %",
     identityMiningHelp: "Une seule fois, une vingtaine de secondes : ce petit calcul rend les faux comptes coûteux, pour que les blocages tiennent.",
+    identityFailed: "⚠ Création de l'identité impossible",
+    logIdentityReady: "✓ Identité prête : code {0}",
     ipNotice: "Les personnes d'un salon sont connectées directement entre elles (pair-à-pair) : chacun peut voir l'adresse IP des autres.",
     // Protection
     errTooFast: "Doucement : {0} messages par seconde au plus.",
     sysFlood: "{0} envoie trop de messages : en sourdine pendant 1 minute",
+    noticeMuted: "Trop de messages : en sourdine pendant 1 minute.",
+    floodHelp: "Même règle pour tout le monde, non réglable : 2 messages par seconde au plus. Les messages d'une extension modifiée pour dépasser la limite sont ignorés, et son auteur est mis en sourdine une minute s'il insiste. Les faux comptes coûtent une preuve de travail.",
     block: "Bloquer",
     blockAsk: "Bloquer…",
     blockConfirmTitle: "Bloquer {0} ?",
@@ -88,6 +94,7 @@ const COMMON_STRINGS = {
     support: "Support on Ko-fi",
     send: "Send",
     cancel: "Cancel",
+    ok: "OK",
     close: "Close",
     sure: "Sure?",
     yes: "Yes",
@@ -104,14 +111,19 @@ const COMMON_STRINGS = {
     privateMessage: "Private message",
     chatSound: "Sound for every new message",
     nickname: "Nickname",
+    nameAsk: "Nickname shown in rooms, which you can change later in the settings",
     defaultName: "Guest",
     codeLabel: "Your code",
     codeHelp: "This code goes with your name everywhere. It's tied to your identity: someone taking your nickname won't have the same code.",
     identityMining: "Creating your anti-spam identity… {0}%",
     identityMiningHelp: "Only once, about 20 seconds: this small computation makes fake accounts costly, so blocks hold.",
+    identityFailed: "⚠ Couldn't create your identity",
+    logIdentityReady: "✓ Identity ready: your code is {0}",
     ipNotice: "People in a room are connected directly to each other (peer-to-peer): everyone can see the others' IP address.",
     errTooFast: "Slow down: {0} messages per second at most.",
     sysFlood: "{0} is sending too many messages: muted for 1 minute",
+    noticeMuted: "Too many messages: you're muted for 1 minute.",
+    floodHelp: "Same rule for everyone, not adjustable: 2 messages per second at most. Messages from an extension modified to go beyond are ignored, and its author is muted for a minute if they keep going. Fake accounts cost a proof of work.",
     block: "Block",
     blockAsk: "Block…",
     blockConfirmTitle: "Block {0}?",
@@ -148,6 +160,22 @@ function t(key, ...args) {
   const app = typeof STRINGS === "undefined" ? {} : STRINGS;
   const text = app[LANG]?.[key] ?? COMMON_STRINGS[LANG][key] ?? app.fr?.[key] ?? COMMON_STRINGS.fr[key] ?? key;
   return text.replace(/\{(\d)\}/g, (_, i) => String(args[i] ?? ""));
+}
+
+// Pseudo proposé tant que la personne n'en a pas choisi : « Invité-1234 » (GUIDE.md)
+function proposedName() {
+  return `${t("defaultName")}-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+// Pseudo proposé (dans une des langues), pas encore choisi par la personne
+function isProposedName(name) {
+  const bases = Object.values(COMMON_STRINGS).map((s) => s.defaultName).join("|");
+  return new RegExp(`^(${bases})-\\d{4}$`).test(name);
+}
+
+// Compteur d'un badge : « 9+ » au-delà de max (9 dans une page, 99 sur le bouton)
+function countText(n, max = 9) {
+  return n > max ? `${max}+` : String(n);
 }
 
 // Remplit les éléments marqués data-i18n (texte), data-i18n-title, data-i18n-placeholder

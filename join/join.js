@@ -11,104 +11,24 @@ const $ = (s) => document.querySelector(s);
 // Textes propres à cette page ; les termes communs (Rejoindre, Envoyer, Pseudo, Ton code…)
 // viennent de i18n-core.js.
 
-const STRINGS = {
-  fr: {
-    intro: "Rejoindre le salon pour écouter ou jouer au blind test ensemble.",
-    roomName: "Nom du salon",
-    volume: "Volume",
-    shareMoment: "📍 Partager ce moment",
-    shareMomentTitle: "Envoyer ce moment de la vidéo dans le chat",
-    hostPlaylist: "Playlist de l'hôte",
-    hostPlaylistHelp: "· un clic pour proposer dans le chat",
-    chatPlaceholder: "Message (ou réponse en blind test)",
-    players: "{0} joueur(s)",
-    waiting: "En attente d'une vidéo…",
-    chapters: "Chapitres",
-    proposeVideoTitle: "Proposer cette vidéo dans le chat",
-    proposeChapterTitle: "Proposer ce chapitre dans le chat",
-    video: "vidéo",
-    host: "Hôte",
-    yourGuess: "🔒 Réponse cachée : {0}",
-    someoneGuessed: "🔒 {0} a proposé une réponse",
-    timeUp: "Temps écoulé",
-    round: "Manche {0}/{1}",
-    blindIdle: "En attente du lancement de la partie par l'hôte…",
-    blindLoading: "La partie va commencer…",
-    blindPlaying: "Morceau mystère : réponses dans le chat !",
-    blindTimeup: "Temps écoulé !",
-    blindRevealed: "Réponse : {0}",
-    blindOver: "Partie terminée",
-    found: "✓ Trouvé",
-    missed: "✗ Raté",
-    nextIn: "suite dans {0} s",
-    hintMax: "max {0} pts",
-    secretOnTitle: "Réponse cachée jusqu'à la révélation (un clic pour écrire en clair)",
-    secretOffTitle: "Message visible par tous (un clic pour cacher la réponse)",
-    sysJoined: "{0} a rejoint le salon",
-    sysLeft: "{0} est parti",
-    sysPointPlus: "+{0} pour {1} (total {2})",
-    sysPointMinus: "{0} pour {1} (total {2})",
-    sysKicked: "{0} a été exclu du salon",
-    sysBanned: "{0} a été banni",
-    sysNobody: "Personne n'a trouvé cette fois",
-    errNotFound: "Salon introuvable : nom à vérifier, ou salon fermé par l'hôte.",
-    errCantConnect: "Connexion impossible ({0}).",
-    errDisconnected: "Déconnecté de l'hôte",
-    errClosed: "L'hôte a fermé le salon",
-    errFull: "Ce salon est complet (24 joueurs).",
-    errKicked: "Exclu du salon par l'hôte.",
-    errBanned: "Banni des salons de cet hôte.",
-    noticeMuted: "Trop de messages : en sourdine pendant 1 minute.",
-  },
-  en: {
-    intro: "Join the room to listen or play blind test together.",
-    roomName: "Room name",
-    volume: "Volume",
-    shareMoment: "📍 Share this moment",
-    shareMomentTitle: "Send this moment of the video to the chat",
-    hostPlaylist: "Host's playlist",
-    hostPlaylistHelp: "· click to suggest it in the chat",
-    chatPlaceholder: "Type here (your answer in blind test)",
-    players: "{0} player(s)",
-    waiting: "Waiting for a video…",
-    chapters: "Chapters",
-    proposeVideoTitle: "Suggest this video in the chat",
-    proposeChapterTitle: "Suggest this chapter in the chat",
-    video: "video",
-    host: "Host",
-    yourGuess: "🔒 Your answer: {0}",
-    someoneGuessed: "🔒 {0} made a guess",
-    timeUp: "Time's up",
-    round: "Round {0}/{1}",
-    blindIdle: "Waiting for the host to start the game…",
-    blindLoading: "The game is about to start…",
-    blindPlaying: "Mystery track: type your answer in the chat!",
-    blindTimeup: "Time's up!",
-    blindRevealed: "Answer: {0}",
-    blindOver: "Game over",
-    found: "✓ Got it",
-    missed: "✗ Missed",
-    nextIn: "next in {0} s",
-    hintMax: "max {0} pts",
-    secretOnTitle: "Answer hidden until the reveal (click to write in the open)",
-    secretOffTitle: "Message visible to everyone (click to hide your answer)",
-    sysJoined: "{0} joined the room",
-    sysLeft: "{0} left",
-    sysPointPlus: "+{0} for {1} (total {2})",
-    sysPointMinus: "{0} for {1} (total {2})",
-    sysKicked: "{0} was kicked from the room",
-    sysBanned: "{0} was banned",
-    sysNobody: "Nobody got it this time",
-    errNotFound: "Room not found: check the name, or the host closed the room.",
-    errCantConnect: "Can't connect ({0}).",
-    errDisconnected: "Disconnected from the host",
-    errClosed: "The host closed the room",
-    errFull: "This room is full (24 players).",
-    errKicked: "The host kicked you from the room.",
-    errBanned: "The host banned you from their rooms.",
-    noticeMuted: "Too many messages: you're muted for 1 minute.",
-  },
-};
+// Textes : ceux de Sidetrack (../i18n.js, chargé avant) et du kit commun. Ici, seulement
+// ceux propres à cette page (sa mise en page diffère de la barre latérale).
+Object.assign(STRINGS.fr, {
+  intro: "Rejoindre le salon pour écouter ou jouer au blind test ensemble.",
+  hostPlaylist: "Playlist de l'hôte",
+  hostPlaylistHelp: "· un clic pour proposer dans le chat",
+  chatPlaceholder: "Message (ou réponse en blind test)",
+  proposeVideoTitle: "Proposer cette vidéo dans le chat",
+  proposeChapterTitle: "Proposer ce chapitre dans le chat",
+});
+Object.assign(STRINGS.en, {
+  intro: "Join the room to listen or play blind test together.",
+  hostPlaylist: "Host's playlist",
+  hostPlaylistHelp: "· click to suggest it in the chat",
+  chatPlaceholder: "Type here (your answer in blind test)",
+  proposeVideoTitle: "Suggest this video in the chat",
+  proposeChapterTitle: "Suggest this chapter in the chat",
+});
 
 function store(key, value) {
   try {
@@ -162,72 +82,31 @@ const expanded = new Set();
 // bannir une identité. Elle s'accompagne d'une preuve de travail, calculée une seule fois
 // puis gardée, qui donne ton code de 4 caractères.
 
-const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-const unhex = (s) => Uint8Array.from(s.match(/../g).map((h) => parseInt(h, 16)));
 // Version à incrémenter avec le kit (cache de GitHub Pages)
-const pow = createPow({ app: "sidetrack", worker: "../common/pow-worker.js?v=3" });
-
-let secret = store("sidetrack-identity");
-if (typeof secret !== "string" || !/^[0-9a-f]{64}$/.test(secret)) {
-  secret = hex(NostrTools.generateSecretKey());
-  store("sidetrack-identity", secret);
-}
-const identity = { secret: unhex(secret), pubkey: NostrTools.getPublicKey(unhex(secret)), pow: null, code: "" };
-
-let mining = null;      // { tries } pendant le calcul
+const pow = createPow({ app: "sidetrack", worker: "../common/pow-worker.js?v=4" });
+const myIdentity = createIdentity({
+  pow,
+  read: async () => ({ secret: store("sidetrack-identity"), proof: store("sidetrack-pow-v2") }),
+  write: async ({ secret, proof }) => (secret ? store("sidetrack-identity", secret) : store("sidetrack-pow-v2", proof)),
+  onChange: () => {
+    renderIdentity();
+    if (powWaiting) powProgress();
+  },
+});
+const identity = myIdentity.identity; // { secret, pubkey, pow, code } : rempli par le kit
 let powWaiting = false; // l'invité attend la fin du calcul pour entrer
-let proofReady = null;  // Promise de la preuve
-
-function proofDone(nonce, code) {
-  identity.pow = nonce;
-  identity.code = code;
-  mining = null;
-  store("sidetrack-pow-v2", { v: POW.VERSION, pubkey: identity.pubkey, nonce, code });
-  renderIdentity();
-}
 
 // Calcul lancé dès l'ouverture de la page, en arrière-plan : le temps de taper son pseudo,
 // il est souvent déjà fini quand on rejoint le salon
-function prepareProof() {
-  const saved = store("sidetrack-pow-v2");
-  if (saved?.pubkey === identity.pubkey && Number.isSafeInteger(saved.nonce)) {
-    if (saved.v === POW.VERSION && typeof saved.code === "string") {
-      proofDone(saved.nonce, saved.code);
-      return Promise.resolve();
-    }
-    // Preuve d'avant le kit commun : même calcul, une vérification redonne le code
-    return pow.check(identity.pubkey, saved.nonce).then(({ bits, code }) => {
-      if (bits >= POW.BITS) return proofDone(saved.nonce, code);
-      return mineProof();
-    });
-  }
-  return mineProof();
-}
-
-function mineProof() {
-  mining = { tries: 0 };
-  return pow
-    .mine(identity.pubkey, POW.BITS, (tries) => {
-      mining.tries = tries;
-      if (powWaiting) powProgress();
-    })
-    .then(({ nonce, code }) => proofDone(nonce, code));
-}
-
-try {
-  proofReady = prepareProof();
-} catch {
-  proofReady = Promise.reject(new Error("pow")); // pas de Worker
-}
+const proofReady = myIdentity.load().then(() => myIdentity.ready());
 proofReady.catch(() => {});
 
-// Nombre d'essais imprévisible (en moyenne 2^bits) : la barre avance vite puis ralentit
 function powProgress() {
-  const share = 1 - Math.exp((-2 * (mining?.tries ?? 0)) / 2 ** POW.BITS);
-  loginStatus(t("identityMining", Math.round(100 * share)));
+  const pct = myIdentity.mining ? powPercent(myIdentity.mining.tries) : 0;
+  loginStatus(t("identityMining", pct));
   const bar = $("#pow-progress");
   bar.hidden = false;
-  bar.value = share;
+  bar.value = pct / 100;
 }
 
 // Attend la preuve de travail, en affichant la progression
@@ -255,7 +134,7 @@ async function answerChallenge(msg, code, name) {
     try {
       await waitProof();
     } catch {
-      return loginError(t("errCantConnect", "pow"));
+      return loginError(t("identityFailed"));
     }
     return join(code, name);
   }
@@ -282,7 +161,7 @@ function roomName(text) {
 
 $("#code").value = decodeURIComponent(location.hash.slice(1));
 // Pseudo proposé comme dans l'extension (« Invité-1234 »), sélectionné pour être remplacé d'un geste
-$("#name").value = store("sidetrack-name") ?? `${t("defaultName")}-${Math.floor(1000 + Math.random() * 9000)}`;
+$("#name").value = store("sidetrack-name") ?? proposedName();
 if ($("#code").value) $("#name").select();
 
 $("#login-form").addEventListener("submit", (e) => {
@@ -518,13 +397,6 @@ $("#share-moment").addEventListener("click", () => {
   sendRef({ id: lastSync.id, start: Math.floor(player.getCurrentTime()), label: room?.title ?? "" });
 });
 
-function el(tag, text, cls) {
-  const e = document.createElement(tag);
-  if (text != null) e.textContent = text;
-  if (cls) e.className = cls;
-  return e;
-}
-
 function formatTime(s) {
   s = Math.floor(s);
   const h = Math.floor(s / 3600);
@@ -550,18 +422,18 @@ function renderChat() {
   box.replaceChildren(
     ...chat.map((msg) => {
       // Messages système : clés traduites ici, dans la langue de l'invité
-      if (msg.system) return el("p", msg.key ? t(msg.key, ...(Array.isArray(msg.args) ? msg.args : [])) : "", "system");
+      if (msg.system) return el("p", { textContent: msg.key ? t(msg.key, ...(Array.isArray(msg.args) ? msg.args : [])) : "", className: "system" });
       const who = msg.from === "host" ? t("host") : msg.name;
       if (msg.masked) {
-        return msg.mine ? el("p", t("yourGuess", msg.mine), "masked") : el("p", t("someoneGuessed", who), "masked");
+        return msg.mine ? el("p", { textContent: t("yourGuess", msg.mine), className: "masked" }) : el("p", { textContent: t("someoneGuessed", who), className: "masked" });
       }
       const p = el("p");
-      const name = p.appendChild(el("b", `${who} : `));
+      const name = p.appendChild(el("b", { textContent: `${who} : ` }));
       name.title = label(who, msg.code);
       if (msg.color) name.style.color = msg.color;
       p.append(msg.text ?? "");
       if (msg.ref) {
-        p.append(el("span", `▶ ${cleanText(msg.ref.label, 120) || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, "pill ref"));
+        p.append(el("span", { textContent: `▶ ${cleanText(msg.ref.label, 120) || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, className: "pill ref" }));
       }
       return p;
     })
@@ -574,11 +446,11 @@ function renderChat() {
 function renderQueue() {
   $("#queue").replaceChildren(
     ...room.playlist.map((item, i) => {
-      const li = el("li", null, i === room.index ? "current" : "");
-      const row = li.appendChild(el("div", null, "row"));
+      const li = el("li", { className: i === room.index ? "current" : "" });
+      const row = li.appendChild(el("div", { className: "row" }));
       if (item.chapters?.length) {
         const open = expanded.has(item.id);
-        const toggle = row.appendChild(el("button", open ? "▾" : "▸"));
+        const toggle = row.appendChild(el("button", { textContent: open ? "▾" : "▸" }));
         toggle.title = t("chapters");
         toggle.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -587,16 +459,16 @@ function renderQueue() {
           renderQueue();
         });
         if (open) {
-          const list = li.appendChild(el("ul", null, "chapters"));
+          const list = li.appendChild(el("ul", { className: "chapters" }));
           for (const c of item.chapters) {
-            const crow = list.appendChild(el("li")).appendChild(el("div", null, "row"));
-            crow.append(el("time", formatTime(c.start)), el("span", c.title));
+            const crow = list.appendChild(el("li")).appendChild(el("div", { className: "row" }));
+            crow.append(el("time", { textContent: formatTime(c.start) }), el("span", { textContent: c.title }));
             crow.title = t("proposeChapterTitle");
             crow.addEventListener("click", () => sendRef({ id: item.id, start: c.start, label: c.title }));
           }
         }
       }
-      const title = row.appendChild(el("span", item.title));
+      const title = row.appendChild(el("span", { textContent: item.title }));
       row.title = t("proposeVideoTitle");
       title.title = item.title;
       row.addEventListener("click", () => sendRef({ id: item.id, start: 0, label: item.title }));
@@ -606,15 +478,6 @@ function renderQueue() {
 }
 
 // Pastille d'une personne : couleur, nom, code d'identité, score
-function chip(p, { me: mine = false, score = null } = {}) {
-  const li = el("li", null, mine ? "me" : "");
-  const name = li.appendChild(el("span", p.name));
-  if (p.color) name.style.color = p.color;
-  li.append(" ", el("span", p.code || "…", "code"));
-  if (score != null) li.append(el("b", String(score)));
-  return li;
-}
-
 function render() {
   renderSecret();
   // L'hôte joue lui aussi : son score avec les nôtres
@@ -633,7 +496,7 @@ function render() {
   if (!blind) {
     $("#mask").hidden = true;
     $("#hint").hidden = true;
-    $("#now").textContent = room.title ?? t("waiting");
+    $("#now").textContent = room.title ?? t("guestWaiting");
     renderQueue();
     return;
   }
@@ -646,9 +509,9 @@ function render() {
     idle: t("blindIdle"),
     loading: t("blindLoading"),
     playing: t("blindPlaying"),
-    timeup: t("blindTimeup"),
+    timeup: t("timeUpBang"),
     revealed: t("blindRevealed", blind.answer ?? "?") + (blind.nextIn ? ` · ${t("nextIn", blind.nextIn)}` : ""),
-    over: t("blindOver"),
+    over: t("gameOver"),
   }[blind.phase];
   $("#blind-status").textContent = blind.total && blind.phase !== "idle" ? t("round", blind.round, blind.total) : "";
   // Indice façon pendu : le titre se dévoile peu à peu, le maximum de points baisse

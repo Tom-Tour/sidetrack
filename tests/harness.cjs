@@ -333,7 +333,7 @@ function joinPage(code, language = "fr-FR", storage = {}) {
   win.Worker = FakeWorker;
   for (const [k, v] of Object.entries(storage)) win.localStorage.setItem(k, v);
   // Comme dans la page : scripts classiques qui partagent leurs déclarations
-  const scripts = [read("vendor/nostr.bundle.js") + ";window.NostrTools = NostrTools;", ...["common/i18n-core.js", "common/net.js", "common/pow.js", "join/join.js"].map((f) => transform(read(f)))].join("\n;\n");
+  const scripts = [read("vendor/nostr.bundle.js") + ";window.NostrTools = NostrTools;", ...["common/i18n-core.js", "i18n.js", "common/net.js", "common/pow.js", "common/ui.js", "join/join.js"].map((f) => transform(read(f)))].join("\n;\n");
   win.eval(scripts);
   const $ = (s) => win.document.querySelector(s);
   return {

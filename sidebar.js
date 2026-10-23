@@ -297,34 +297,7 @@ function renderHint(hint) {
 }
 
 // --- Éléments d'interface ------------------------------------------------------
-
-function button(label, onClick, cls) {
-  const b = document.createElement("button");
-  b.textContent = label;
-  if (cls) b.className = cls;
-  b.addEventListener("click", onClick);
-  return b;
-}
-
-function el(tag, text, cls) {
-  const e = document.createElement(tag);
-  if (text != null) e.textContent = text;
-  if (cls) e.className = cls;
-  return e;
-}
-
-function swatch(color) {
-  const s = el("span", null, "swatch");
-  if (color) s.style.background = color;
-  return s;
-}
-
-function codeTag(code) {
-  return el("span", code || "…", "code");
-}
-
-// « Nom · CODE » : le code distingue deux personnes qui ont le même nom
-const label = (name, code) => (code ? `${name} · ${code}` : name);
+// el, button, swatch, codeTag, chip, personCard, peopleList : common/ui.js
 
 function formatTime(s) {
   s = Math.floor(s);
@@ -334,15 +307,11 @@ function formatTime(s) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
-// Progression de la preuve de travail : le nombre d'essais est imprévisible (en moyenne
-// 2^bits), la barre avance vite puis ralentit
-const miningShare = (m) => 1 - Math.exp((-2 * m.tries) / m.expected);
-
 function renderNotice() {
   const box = $("#notice");
   box.hidden = !view.notice;
   if (!view.notice) return;
-  const actions = el("div", null, "actions");
+  const actions = el("div", { className: "actions" });
   if (view.notice.focus) actions.appendChild(button(t("goToTab"), () => act("focusPlayer")));
   actions.appendChild(button(t("ok"), () => act("dismissNotice")));
   box.replaceChildren(t(view.notice.key, ...(view.notice.args ?? [])), actions);
@@ -358,7 +327,7 @@ function chatText(parent, text) {
     parent.append(text.slice(last, m.index));
     last = m.index + m[0].length;
     if (m[1]) {
-      parent.appendChild(el("span", m[1], "yt"));
+      parent.appendChild(el("span", { textContent: m[1], className: "yt" }));
       parent.appendChild(button("＋", () => act("addLink", m[1]), "pill ref")).title = t("addToPlaylistTitle");
       continue;
     }
@@ -382,7 +351,7 @@ function renderPublicRooms() {
       const li = el("li");
       li.title = t("join");
       const name = `${r.mode === "blind" ? "❓" : "🎵"} ${r.code}${r.game ? ` · ${t("gameInProgress")}` : ""}`;
-      li.append(el("span", name, "name"), el("span", `${r.players} 👤`, "muted"));
+      li.append(el("span", { textContent: name, className: "name" }), el("span", { textContent: `${r.players} 👤`, className: "muted" }));
       li.addEventListener("click", () => {
         commitName();
         act("joinRoom", r.code);
@@ -424,72 +393,55 @@ function renderPerson(blind) {
     person = null;
     return;
   }
-  const close = button("✕", closePerson, "small");
-  close.title = t("close");
-  const head = el("div", null, "head");
-  head.append(swatch(known.color), el("strong", known.name), codeTag(known.code), el("span", null, "grow"), close);
-
   if (person.confirm) {
     const kind = person.confirm;
-    const yes = button(t(`${kind}Confirm`, known.name), () => {
-      act(kind, known.id);
-      closePerson();
-    }, "danger");
-    const no = button(t("cancel"), () => {
-      person.confirm = null;
-      render();
-    });
-    const actions = el("div", null, "actions");
-    actions.append(yes, no);
-    box.replaceChildren(
-      head,
-      el("p", t(`${kind}ConfirmTitle`, known.name), "warn"),
-      el("p", t(kind === "block" && known.id === "host" ? "blockHostConfirmHelp" : `${kind}ConfirmHelp`), "muted"),
-      actions
-    );
+    const confirm = {
+      kind,
+      help: kind === "block" && known.id === "host" ? t("blockHostConfirmHelp") : undefined,
+      onYes: () => {
+        act(kind, known.id);
+        closePerson();
+      },
+      onNo: () => {
+        person.confirm = null;
+        render();
+      },
+    };
+    box.replaceChildren(...personCard(known, { onClose: closePerson, confirm }));
     return;
   }
-  const actions = el("div", null, "actions");
   const ask = (kind) => () => {
     person.confirm = kind;
     render();
   };
+  const actions = [];
   if (guest) {
-    actions.append(button("⛔ " + t("blockAsk"), ask("block"), "subtle-danger"));
+    actions.push(askButton("block", ask("block")));
   } else {
-    if (blind) actions.append(button("+1", () => act("award", known.id, 1)), button("−1", () => act("award", known.id, -1)));
-    if (known.id !== "host") actions.append(button(t("kickAsk"), ask("kick")), button(t("banAsk"), ask("ban"), "subtle-danger"));
+    if (blind) actions.push(button("+1", () => act("award", known.id, 1)), button("−1", () => act("award", known.id, -1)));
+    if (known.id !== "host") actions.push(askButton("kick", ask("kick")), askButton("ban", ask("ban")));
   }
-  box.replaceChildren(head, actions);
-}
-
-// Pastille d'une personne : couleur, nom, code d'identité, score
-function chip(p, { me = false, onClick = null, score = null } = {}) {
-  const c = el(onClick ? "button" : "span", null, me ? "chip me" : "chip");
-  c.append(swatch(p.color), el("span", p.name), codeTag(p.code));
-  if (score != null) c.append(el("b", String(score)));
-  if (onClick) c.addEventListener("click", onClick);
-  return c;
+  box.replaceChildren(...personCard(known, { onClose: closePerson, actions }));
 }
 
 // Ligne de chat. Hôte : timecodes et vidéos proposées cliquables (pour tout le salon),
 // indice « probable », +1, nom cliquable (fiche). Invité : propositions masquées pendant une manche.
 function chatLine(msg, { guest, referee, playing }) {
-  if (msg.system) return el("p", t(msg.key, ...(msg.args ?? [])), "msg system");
+  if (msg.system) return el("p", { textContent: t(msg.key, ...(msg.args ?? [])), className: "msg system" });
   const who = (m) => (m.from === "host" ? t("host") : m.name);
-  if (msg.masked) return el("p", msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", who(msg)), "msg masked");
+  if (msg.masked) return el("p", { textContent: msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", who(msg)), className: "msg masked" });
   // L'hôte joue (onglet Blind test) : pendant la manche, il ne voit que ses propres réponses
   if (playing && msg.private) {
-    return el("p", msg.from === "host" ? t("yourGuess", msg.text ?? "") : t("someoneGuessed", who(msg)), "msg masked");
+    return el("p", { textContent: msg.from === "host" ? t("yourGuess", msg.text ?? "") : t("someoneGuessed", who(msg)), className: "msg masked" });
   }
-  const p = el("p", null, msg.private ? "msg private" : "msg");
+  const p = el("p", { className: msg.private ? "msg private" : "msg" });
   if (msg.private) p.append("🔒 ");
   // Nom cliquable (fiche) : chez l'hôte, un invité présent ; chez un invité, l'hôte ou un autre invité
   const clickable = guest
     ? msg.from !== view.guest.me && (msg.from === "host" || view.guest.players.some((x) => x.id === msg.from))
     : msg.from !== "host" && view.room?.players.some((x) => x.id === msg.from);
-  const name = p.appendChild(el("span", `${who(msg)} : `, clickable ? "who" : "who me"));
-  name.title = label(who(msg), msg.code);
+  const name = p.appendChild(el("span", { textContent: `${who(msg)} : `, className: clickable ? "who" : "who me" }));
+  name.title = nameWithCode(who(msg), msg.code);
   if (msg.color) name.style.color = msg.color;
   if (clickable) name.addEventListener("click", () => openPerson(msg.from));
   if (msg.text) {
@@ -497,10 +449,10 @@ function chatLine(msg, { guest, referee, playing }) {
     else chatText(p, msg.text);
   }
   // Aide à l'arbitrage : la proposition ressemble au titre
-  if (msg.hint) p.appendChild(el("span", t("probable"), "pill good")).title = t("probableTitle");
+  if (msg.hint) p.appendChild(el("span", { textContent: t("probable"), className: "pill good" })).title = t("probableTitle");
   if (msg.ref) {
     const text = `▶ ${msg.ref.label || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`;
-    p.append(guest ? el("span", text, "pill ref plain") : button(text, () => act("playRef", msg.ref), "pill ref"));
+    p.append(guest ? el("span", { textContent: text, className: "pill ref plain" }) : button(text, () => act("playRef", msg.ref), "pill ref"));
   }
   // Animateur : il donne les points directement depuis une proposition
   if (!guest && referee && msg.from !== "host") p.append(button("+1", () => act("award", msg.from, 1)));
@@ -509,7 +461,7 @@ function chatLine(msg, { guest, referee, playing }) {
 
 function guestStatus(g) {
   if (g.status === "connecting") return t("connecting");
-  if (g.status === "proof") return view.me.mining ? t("identityMining", Math.round(100 * miningShare(view.me.mining))) : t("connecting");
+  if (g.status === "proof") return view.me.mining ? t("identityMining", view.me.mining.percent) : t("connecting");
   if (g.status === "ended") return t(g.endKey, ...(g.endArgs ?? []));
   return t("players", g.players.length);
 }
@@ -537,7 +489,7 @@ function renderRoom(blind) {
   if (roomOpen && !$("#main").hidden) lastSeenId = latest;
   const unread = others.filter((m) => m.id > lastSeenId).length;
   $("#unread").hidden = !unread;
-  $("#unread").textContent = unread > 9 ? "9+" : String(unread);
+  $("#unread").textContent = countText(unread);
   if (latest > lastHeardId) {
     if (lastHeardId && view.settings.chatSound) beep();
     lastHeardId = latest;
@@ -549,9 +501,8 @@ function renderRoom(blind) {
   $("#online").hidden = !roomOpen;
   $("#mining").hidden = !mining || !!room;
   if (mining) {
-    const share = miningShare(mining);
-    $("#mining-title").textContent = t("identityMining", Math.round(100 * share));
-    $("#mining-bar").value = Math.round(100 * share);
+    $("#mining-title").textContent = t("identityMining", mining.percent);
+    $("#mining-bar").value = mining.percent;
   }
   $("#room-panel").hidden = !room;
   $("#room-form").hidden = !!room;
@@ -649,8 +600,8 @@ function renderGuest(g) {
   if (!changed("guest", h.index, itemsKey(h.playlist))) return;
   $("#guest-queue").replaceChildren(
     ...h.playlist.map((item, i) => {
-      const li = el("li", null, i === h.index ? "current" : "");
-      const row = li.appendChild(el("div", null, "row"));
+      const li = el("li", { className: i === h.index ? "current" : "" });
+      const row = li.appendChild(el("div", { className: "row" }));
       const key = `guest:${item.id}`;
       if (item.chapters?.length) {
         const open = expanded.has(key);
@@ -663,16 +614,16 @@ function renderGuest(g) {
           })
         ).title = t("chapters");
         if (open) {
-          const list = li.appendChild(el("ul", null, "chapters"));
+          const list = li.appendChild(el("ul", { className: "chapters" }));
           for (const c of item.chapters) {
-            const crow = list.appendChild(el("li")).appendChild(el("div", null, "row"));
-            crow.append(el("time", formatTime(c.start)), el("span", c.title));
+            const crow = list.appendChild(el("li")).appendChild(el("div", { className: "row" }));
+            crow.append(el("time", { textContent: formatTime(c.start) }), el("span", { textContent: c.title }));
             crow.title = c.title;
             crow.addEventListener("click", () => act("guestRef", { id: item.id, start: c.start, label: c.title }));
           }
         }
       }
-      row.appendChild(el("span", item.title)).title = item.title;
+      row.appendChild(el("span", { textContent: item.title })).title = item.title;
       row.addEventListener("click", () => act("guestRef", { id: item.id, start: 0, label: item.title }));
       return li;
     })
@@ -701,7 +652,7 @@ function renderBlind(game, n, multi, room = multi) {
   }[game.phase];
   if (game.phase === "over" && !room) {
     status.append(" : ");
-    status.appendChild(el("strong", `${game.score}/${game.played}`));
+    status.appendChild(el("strong", { textContent: `${game.score}/${game.played}` }));
   }
   $("#blind-actions").replaceChildren(...(multi ? emceeControls(game, n) : playerActions(game, n, room, self)));
 
@@ -709,8 +660,8 @@ function renderBlind(game, n, multi, room = multi) {
   const writing = !room && !self && ["playing", "timeup", "revealed"].includes(game.phase);
   $("#solo-guess").hidden = !writing;
   if (writing) {
-    $("#guess-list").replaceChildren(...game.guesses.map((g) => el("li", `🔒 ${g.text}`)));
-    if (game.phase === "revealed") $("#guess-list").appendChild(el("li", t("soloPoints", game.lastPoints), "points"));
+    $("#guess-list").replaceChildren(...game.guesses.map((g) => el("li", { textContent: `🔒 ${g.text}` })));
+    if (game.phase === "revealed") $("#guess-list").appendChild(el("li", { textContent: t("soloPoints", game.lastPoints), className: "points" }));
     $("#guess-input").disabled = game.phase === "revealed";
   }
 
@@ -774,7 +725,7 @@ let dragging = false;
 // Animateur : clic = prochaine manche, pistes déjà jouées grisées, rien d'éditable.
 function trackList(index, { picking = false, played = new Set() } = {}) {
   return items().map((item, i) => {
-    const li = el("li", null, i === index ? (view.loading ? "current loading" : "current") : played.has(`${i}`) ? "played" : "");
+    const li = el("li", { className: i === index ? (view.loading ? "current loading" : "current") : played.has(`${i}`) ? "played" : "" });
     li.draggable = !picking;
     li.addEventListener("dragstart", (e) => {
       dragging = true;
@@ -796,7 +747,7 @@ function trackList(index, { picking = false, played = new Set() } = {}) {
       act("moveItem", Number(e.dataTransfer.getData("text/plain")), i);
     });
 
-    const row = li.appendChild(el("div", null, "row"));
+    const row = li.appendChild(el("div", { className: "row" }));
     const open = expanded.has(item.id);
     row.appendChild(
       button(open ? "▾" : "▸", (e) => {
@@ -806,7 +757,7 @@ function trackList(index, { picking = false, played = new Set() } = {}) {
         render();
       })
     ).title = t("chapters");
-    const title = row.appendChild(el("span", item.title));
+    const title = row.appendChild(el("span", { textContent: item.title }));
     title.title = item.title;
     row.addEventListener("click", () => act(picking ? "blindPick" : "play", i, null));
     if (!picking) {
@@ -820,20 +771,20 @@ function trackList(index, { picking = false, played = new Set() } = {}) {
     }
 
     if (open) {
-      const list = li.appendChild(el("ul", null, "chapters"));
+      const list = li.appendChild(el("ul", { className: "chapters" }));
       if (!Array.isArray(item.chapters)) {
-        list.appendChild(el("li", t("loadingChapters"), "muted"));
+        list.appendChild(el("li", { textContent: t("loadingChapters"), className: "muted" }));
         if (!chaptersAsked.has(item.id)) {
           chaptersAsked.add(item.id);
           act("loadChapters", i);
         }
       } else if (!item.chapters.length) {
-        list.appendChild(el("li", t("noChapters"), "muted"));
+        list.appendChild(el("li", { textContent: t("noChapters"), className: "muted" }));
       } else {
         item.chapters.forEach((c, k) => {
-          const cli = list.appendChild(el("li", null, played.has(`${i}:${k}`) ? "played" : ""));
-          const crow = cli.appendChild(el("div", null, "row"));
-          crow.append(el("time", formatTime(c.start)), el("span", c.title));
+          const cli = list.appendChild(el("li", { className: played.has(`${i}:${k}`) ? "played" : "" }));
+          const crow = cli.appendChild(el("div", { className: "row" }));
+          crow.append(el("time", { textContent: formatTime(c.start) }), el("span", { textContent: c.title }));
           crow.title = c.title;
           crow.addEventListener("click", () => (picking ? act("blindPick", i, k) : act("playAt", i, c.start)));
         });
@@ -972,27 +923,11 @@ function renderSettings(settings) {
   $("#set-nickname").placeholder = t("defaultName");
   $("#my-code").textContent = view.me.code || "…";
   // Personnes bloquées puis bannies, au format « Nom · CODE »
-  const blocked = Object.entries(settings.blocked);
   $("#blocked").replaceChildren(
-    ...(blocked.length
-      ? blocked.map(([id, name]) => {
-          const li = el("li");
-          li.appendChild(el("span", name)).title = id;
-          li.append(button(t("unblock"), () => act("unblock", id)));
-          return li;
-        })
-      : [el("li", t("noBlocked"), "muted")])
+    ...peopleList(Object.entries(settings.blocked), { empty: t("noBlocked"), action: t("unblock"), onAction: (id) => act("unblock", id) })
   );
-  const banned = Object.entries(settings.banned);
   $("#banned").replaceChildren(
-    ...(banned.length
-      ? banned.map(([id, name]) => {
-          const li = el("li");
-          li.appendChild(el("span", name)).title = id;
-          li.append(button(t("unban"), () => act("unban", id)));
-          return li;
-        })
-      : [el("li", t("noBanned"), "muted")])
+    ...peopleList(Object.entries(settings.banned), { empty: t("noBanned"), action: t("unban"), onAction: (id) => act("unban", id) })
   );
   $("#log").textContent = view.log.join("\n");
 }

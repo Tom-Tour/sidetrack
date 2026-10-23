@@ -85,7 +85,7 @@ function loadSettings(raw = {}) {
     if (value !== undefined) out[key] = value;
   }
   // Pseudo déjà changé avant l'ajout de nameSet (pas celui proposé, « Invité-1234 ») : choisi
-  if (out.nickname && !/^(Invité|Guest)-\d{4}$/.test(out.nickname)) out.nameSet = true;
+  if (out.nickname && !isProposedName(out.nickname)) out.nameSet = true;
   for (const key of Object.keys(DEFAULTS.blind)) {
     const value = cleanBlind(key, raw.blind?.[key]);
     if (value !== undefined) out.blind[key] = value;
@@ -114,7 +114,7 @@ let loadingSince = 0;  // vidéo demandée au lecteur, pas encore démarrée (in
 let playerShown = false; // onglet du lecteur affiché (bouton 📺 allumé)
 let importTarget = null;
 let notice = null;     // { key, args?, focus? } : traduit par la barre latérale
-let logLines = [];
+const journal = createLog();
 
 // Blind test, joué (« blind ») ou animé par l'hôte d'un salon (« emcee ») : même partie,
 // mais l'animateur voit tout (titres, vidéo, propositions) et ne joue pas
@@ -127,8 +127,7 @@ let game = { phase: "idle", order: [], pos: -1, score: 0, played: 0, remaining: 
 let gameTimer = null;
 
 function log(msg) {
-  logLines.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
-  logLines.length = Math.min(logLines.length, 100);
+  journal.add(msg);
   update();
 }
 
@@ -143,69 +142,18 @@ function save() {
 // seule fois, qui donne aussi le code d'identité affiché à côté du nom.
 
 const pow = createPow({ app: "sidetrack", worker: "common/pow-worker.js" });
-const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-const unhex = (s) => Uint8Array.from(s.match(/../g).map((h) => parseInt(h, 16)));
-
-let identity = { secret: null, pubkey: "", pow: null, code: "" };
-let mining = null;     // { tries } pendant le calcul
-let identityWaiters = [];
-
-// Résolue quand la preuve de notre identité est prête
-function whenIdentity() {
-  if (identity.pow != null) return Promise.resolve();
-  return new Promise((resolve) => identityWaiters.push(resolve));
-}
-
-function identityReady(nonce, code) {
-  identity.pow = nonce;
-  identity.code = code;
-  mining = null;
-  browser.storage.local.set({ pow: { v: POW.VERSION, pubkey: identity.pubkey, nonce, code } });
-  log(t("logIdentity", code));
-  for (const resolve of identityWaiters) resolve();
-  identityWaiters = [];
-  update();
-}
-
-function mineIdentity() {
-  mining = { tries: 0 };
-  update();
-  let shown = 0;
-  pow
-    .mine(identity.pubkey, POW.BITS, (tries) => {
-      mining.tries = tries;
-      if (tries - shown >= 5) {
-        shown = tries;
-        update();
-      }
-    })
-    .then(({ nonce, code }) => identityReady(nonce, code))
-    .catch(() => {
-      mining = null;
-      update();
-    });
-}
-
-async function initIdentity(stored) {
-  let secret = typeof stored.identity === "string" && /^[0-9a-f]{64}$/.test(stored.identity) ? stored.identity : null;
-  if (!secret) {
-    secret = hex(NostrTools.generateSecretKey());
-    await browser.storage.local.set({ identity: secret });
-  }
-  identity = { secret: unhex(secret), pubkey: NostrTools.getPublicKey(unhex(secret)), pow: null, code: "" };
-  const saved = stored.pow;
-  if (saved?.pubkey !== identity.pubkey || !Number.isSafeInteger(saved.nonce)) return mineIdentity();
-  if (saved.v === POW.VERSION && typeof saved.code === "string") {
-    identity.pow = saved.nonce;
-    identity.code = saved.code;
-    return;
-  }
-  // Preuve d'avant le kit commun ({ pubkey, bits, nonce }) : même calcul, il ne lui manque que
-  // le code, qu'une seule vérification redonne
-  const { bits, code } = await pow.check(identity.pubkey, saved.nonce);
-  if (bits >= POW.BITS) identityReady(saved.nonce, code);
-  else mineIdentity();
-}
+// Clé et preuve gardées dans browser.storage (« identity », « pow ») ; calcul et reprise : kit
+const myIdentity = createIdentity({
+  pow,
+  read: async () => {
+    const stored = await browser.storage.local.get(["identity", "pow"]);
+    return { secret: stored.identity, proof: stored.pow };
+  },
+  write: ({ secret, proof }) => browser.storage.local.set(secret ? { identity: secret } : { pow: proof }),
+  onChange: () => update(),
+  onReady: (code) => log(t("logIdentityReady", code)),
+});
+const identity = myIdentity.identity; // { secret, pubkey, pow, code } : rempli par le kit
 
 // --- Liaison avec la barre latérale ---------------------------------------
 
@@ -216,8 +164,8 @@ function snapshot() {
   const loading = !!loadingSince && Date.now() - loadingSince < LOADING_MAX;
   const hint = ["playing", "timeup"].includes(game.phase) ? { mask: hintMask(), max: maxPoints() } : null;
   return {
-    state, settings, game, hint, playerState, loading, playerShown, notice, log: logLines,
-    me: { code: identity.code, mining: mining && { tries: mining.tries, expected: 2 ** POW.BITS } },
+    state, settings, game, hint, playerState, loading, playerShown, notice, log: journal.lines,
+    me: { code: identity.code, mining: myIdentity.mining && { percent: powPercent(myIdentity.mining.tries) } },
     room: roomSnapshot(), guest: guestSnapshot(), rooms: publicRoomsSnapshot(),
   };
 }
@@ -272,7 +220,7 @@ function noteMessage() {
   if (ports.size) return;
   unread++;
   browser.browserAction.setBadgeBackgroundColor({ color: BADGE_COLORS.COUNT });
-  browser.browserAction.setBadgeText({ text: unread > 99 ? "99+" : String(unread) });
+  browser.browserAction.setBadgeText({ text: countText(unread, 99) });
 }
 
 function clearUnread() {
@@ -1197,11 +1145,6 @@ const actions = {
 
 // --- Démarrage -------------------------------------------------------------
 
-// Pseudo proposé tant qu'aucun n'a été choisi, comme dans Pagemates : « Invité-1234 »
-function proposedName() {
-  return `${t("defaultName")}-${Math.floor(1000 + Math.random() * 9000)}`;
-}
-
 async function init() {
   const stored = await browser.storage.local.get(["sidetrack", "settings", "identity", "pow"]);
   const data = stored.sidetrack ?? {};
@@ -1218,7 +1161,7 @@ async function init() {
   state.index = -1;
   save();
   update();
-  await initIdentity(stored);
+  await myIdentity.load();
   update();
 }
 

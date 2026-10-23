@@ -92,7 +92,12 @@ async function answerChallenge(g, msg) {
     g.conn = null;
     g.peer.destroy();
     update();
-    await whenIdentity();
+    try {
+      await myIdentity.ready();
+    } catch {
+      if (guest === g) endGuest(g, "identityFailed");
+      return;
+    }
     if (guest !== g) return;
     g.status = "connecting";
     update();

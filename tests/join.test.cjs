@@ -27,8 +27,8 @@ const { read, until, check, done, makeEngine, joinPage, playlist, FakeWorker } =
     alice.join("Alice");
     await until(() => !alice.$("#room").hidden && host.snap().room.players.some((p) => p.name === "Alice"), 5000);
     check("Alice entre dans le salon", !alice.$("#room").hidden && host.snap().room.players.some((p) => p.name === "Alice" && p.code === codeAlice));
-    await until(() => alice.$("#players li"));
-    check("pastille avec son code", alice.$("#players li.me .code")?.textContent === codeAlice);
+    await until(() => alice.$("#players .chip"));
+    check("pastille avec son code", alice.$("#players .chip.me .code")?.textContent === codeAlice);
 
     // --- Chat : codes en infobulle, limites ---
     host.act("hostChat", "bienvenue Alice");
@@ -56,7 +56,7 @@ const { read, until, check, done, makeEngine, joinPage, playlist, FakeWorker } =
     const aliceId = host.snap().room.players.find((p) => p.name === "Alice").id;
     host.act("ban", aliceId);
     await until(() => alice.$("#room-status").textContent.includes("banni"), 3000);
-    check("bannie : « Banni des salons de cet hôte. »", alice.$("#room-status").textContent === "Banni des salons de cet hôte.");
+    check("bannie : « Banni des salons de cet hôte »", alice.$("#room-status").textContent === "Banni des salons de cet hôte");
     check("messages du système traduits (clés sys*)", alice.chat().some((t) => t === "Alice a rejoint le salon"));
 
     // --- Langue ---

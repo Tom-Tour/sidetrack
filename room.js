@@ -32,9 +32,6 @@ const CHAT_LIMIT = 200;
 // Temps laissé à un invité pour se présenter (sa preuve de travail est calculée avant)
 const HELLO_TIMEOUT = 30 * 1000;
 
-// Couleurs des joueurs, lisibles sur fond clair comme sombre
-const PALETTE = ["#e5484d", "#f76b15", "#d5a000", "#30a46c", "#12a594", "#0090ff", "#6e56cf", "#d6409f", "#8e4ec6", "#ab6400"];
-
 // { code, link, status, public, peer, players: Map(pubkey → joueur), pending: Map(conn → {…}),
 //   kicked: Set(pubkey), chat: [], beat }
 let room = null;
@@ -242,11 +239,6 @@ function guestName(raw) {
   const name = cleanName(raw, t("defaultName"));
   const reserved = new Set(["hôte", "host", t("host").toLowerCase()]);
   return reserved.has(name.toLowerCase()) ? t("defaultName") : name;
-}
-
-// Couleur stable pour une identité
-function colorFor(id) {
-  return PALETTE[parseInt(id.slice(0, 8), 16) % PALETTE.length];
 }
 
 function admit(conn, entry, id, code, rawName) {

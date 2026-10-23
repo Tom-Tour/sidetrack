@@ -83,7 +83,6 @@ const STRINGS = {
     noChapters: "Pas de chapitres",
     removeItem: "Retirer de la playlist",
     goToTab: "Aller à l'onglet",
-    ok: "OK",
 
     // Blind test
     tracks: "{0} morceau(x) dans la playlist.",
@@ -147,8 +146,6 @@ const STRINGS = {
     backupSave: "💾 Sauvegarder",
     backupRestore: "📂 Restaurer…",
     nicknameHelp: "C'est le nom que voient les autres dans les salons.",
-    nameAsk: "Pseudo dans les salons, modifiable plus tard dans les réglages",
-    nameOk: "OK",
 
     // Messages système du chat (envoyés comme clés : chacun les lit dans sa langue)
     sysJoined: "{0} a rejoint le salon",
@@ -181,7 +178,6 @@ const STRINGS = {
     noticePrivatePlaylist:
       "Impossible de lire cette playlist. Elle est sûrement privée (ou c'est « À regarder plus tard », « J'aime » ou un Mix) : le lecteur intégré ne voit pas le compte YouTube connecté. Il suffit de la passer en « Non répertoriée » sur YouTube puis de réessayer.",
     noticeNameShort: "Nom de salon trop court : 3 caractères minimum (lettres, chiffres, - ou _).",
-    noticeMuted: "Trop de messages : en sourdine pendant 1 minute.",
     noticeRestored: "Restauré : {0} playlist(s), {1} morceau(x).",
     noticeBadBackup: "Ce fichier n'est pas une sauvegarde Sidetrack.",
 
@@ -209,7 +205,6 @@ const STRINGS = {
     logRetryVisible: "YouTube a refusé de démarrer en arrière-plan : nouvel essai onglet affiché",
     logPreset: "Playlist « {0} » ajoutée ({1} morceaux)",
     logBackup: "Sauvegarde : {0} playlist(s) dans {1}",
-    logIdentity: "✓ Identité prête : code {0}",
     logRoomDiag: "Création du salon : PeerJS {0}, WebRTC {1}",
     logRoomOpen: "Salon {0} ouvert",
     logRoomOpenPublic: "Salon {0} ouvert (public)",
@@ -308,7 +303,6 @@ const STRINGS = {
     noChapters: "No chapters",
     removeItem: "Remove from playlist",
     goToTab: "Go to the tab",
-    ok: "OK",
 
     tracks: "{0} track(s) in the playlist.",
     emptyShort: "Empty playlist.",
@@ -370,8 +364,6 @@ const STRINGS = {
     backupSave: "💾 Save",
     backupRestore: "📂 Restore…",
     nicknameHelp: "This is the name others see in rooms.",
-    nameAsk: "Nickname in rooms, which you can change later in the settings",
-    nameOk: "OK",
 
     sysJoined: "{0} joined the room",
     sysLeft: "{0} left",
@@ -401,7 +393,6 @@ const STRINGS = {
     noticePrivatePlaylist:
       "This playlist can't be read. It's probably private (or it's Watch Later, Liked videos or a Mix): the embedded player doesn't see your YouTube account. Make it “Unlisted” on YouTube and try again.",
     noticeNameShort: "Room name too short: at least 3 characters (letters, digits, - or _).",
-    noticeMuted: "Too many messages: you're muted for 1 minute.",
     noticeRestored: "Restored: {0} playlist(s), {1} track(s).",
     noticeBadBackup: "This file is not a Sidetrack backup.",
 
@@ -428,7 +419,6 @@ const STRINGS = {
     logRetryVisible: "YouTube refused to start in the background: retrying with the tab shown",
     logPreset: "Playlist “{0}” added ({1} tracks)",
     logBackup: "Backup: {0} playlist(s) in {1}",
-    logIdentity: "✓ Identity ready: your code is {0}",
     logRoomDiag: "Creating room: PeerJS {0}, WebRTC {1}",
     logRoomOpen: "Room {0} open",
     logRoomOpenPublic: "Room {0} open (public)",

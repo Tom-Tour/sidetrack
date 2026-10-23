@@ -32,6 +32,31 @@ const BADGE_COLORS = { PRIVATE: "#e5484d", COUNT: "#0090ff" };
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
+const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+const unhex = (s) => Uint8Array.from(s.match(/../g) ?? [], (h) => parseInt(h, 16));
+
+// Couleurs des personnes, lisibles sur fond clair comme sombre (choix de couleur dans les
+// réglages, ou couleur tirée de l'identité avec colorFor)
+const PALETTE = ["#e5484d", "#f76b15", "#d5a000", "#30a46c", "#12a594", "#0090ff", "#6e56cf", "#d6409f", "#8e4ec6", "#ab6400"];
+
+// Couleur stable pour une identité (clé publique en hexadécimal)
+function colorFor(id) {
+  return PALETTE[parseInt(String(id).slice(0, 8), 16) % PALETTE.length || 0];
+}
+
+// Journal (Réglages > Journal) : « [heure] texte », la ligne la plus récente en premier.
+//   const journal = createLog();  journal.add("…");  snapshot : { log: journal.lines }
+function createLog(max = 100) {
+  const lines = [];
+  return {
+    lines,
+    add(text) {
+      lines.unshift(`[${new Date().toLocaleTimeString()}] ${text}`);
+      lines.length = Math.min(lines.length, max);
+    },
+  };
+}
+
 // Compteur glissant sur une seconde : true si l'événement passe (et il est compté)
 function rateOk(times, limit, now = Date.now()) {
   while (times.length && now - times[0] >= 1000) times.shift();
