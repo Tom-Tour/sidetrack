@@ -155,6 +155,7 @@ function cleanGuestChat(m) {
     code: cleanText(m.code, 4),
     color: m.color ? cleanColor(m.color) : undefined,
     text: m.text == null ? undefined : cleanText(m.text),
+    at: Number.isFinite(m.at) ? m.at : undefined, // heure d'envoi chez l'hôte (ms)
   };
 }
 

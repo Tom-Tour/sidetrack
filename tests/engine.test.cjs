@@ -62,8 +62,12 @@ const { until, check, done, makeEngine, playlist, FakeWorker } = require("./harn
     host.act("hostChat", "bienvenue");
     const tooFast = [await host.ask("hostChat", "un"), await host.ask("hostChat", "deux"), await host.ask("hostChat", "trois")];
     check("hôte : réponse errTooFast au-delà de 2 messages par seconde", tooFast.includes("errTooFast"), JSON.stringify(tooFast));
+    await until(() => host.snap().notice?.key === "errTooFast");
+    check("hôte : bandeau errTooFast (2 par seconde), comme un invité", host.snap().notice?.key === "errTooFast" && host.snap().notice?.args?.[0] === 2, JSON.stringify(host.snap().notice));
     await until(() => bob.snap().guest.chat.some((x) => x.text === "bienvenue"));
     check("Bob reçoit le message de l'hôte avec son code", bob.snap().guest.chat.find((x) => x.text === "bienvenue")?.code === codeHost);
+    check("heure d'envoi gardée chez l'invité (at)", Math.abs(bob.snap().guest.chat.find((x) => x.text === "bienvenue").at - Date.now()) < 5000);
+    check("heure invalide écartée chez l'invité", bob.eval('cleanGuestChat({ text: "x", at: "12:00" }).at') === undefined && bob.eval('cleanGuestChat({ text: "x", at: NaN }).at') === undefined);
     await until(() => false, 1100);
     for (let i = 0; i < 4; i++) bob.act("guestChat", `vite ${i}`);
     await until(() => bob.snap().notice?.key === "errTooFast");

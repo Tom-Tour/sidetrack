@@ -56,6 +56,20 @@ const { read, until, check, done, makeEngine, sidebarFor, playlist } = require("
     await until(() => $$("#chat .msg").some((p) => p.textContent.includes("coucou")));
     const line = $$("#chat .msg").find((p) => p.textContent.includes("coucou"));
     check("chat : infobulle « Nom · CODE »", line.querySelector(".who").title === `Bob · ${bob.snap().me.code}`);
+    check("chat : heure HH:MM en tête de ligne", line.firstChild.nodeName === "TIME" && /^\d{1,2}:\d{2}/.test(line.firstChild.textContent), line.firstChild.textContent);
+    check("chat : nom d'un invité ni surligné ni « moi »", !line.querySelector(".who").classList.contains("me"));
+    // L'hôte écrit : son pseudo surligné ; trop vite : bandeau et texte gardé
+    for (const text of ["un", "deux", "trois"]) {
+      $("#chat-input").value = text;
+      $("#chat-form").dispatchEvent(new sb.win.Event("submit", { cancelable: true }));
+    }
+    await until(() => $$("#chat .msg").some((p) => p.textContent.includes("un")) && !$("#notice").hidden);
+    const mineLine = $$("#chat .msg").find((p) => p.textContent.endsWith(" : un"));
+    check("chat : son propre pseudo surligné (.who.me)", mineLine?.querySelector(".who.me")?.textContent === "Hôte : ");
+    check("hôte trop rapide : bandeau « Doucement : 2 messages par seconde au plus. »", $("#notice").textContent.includes("Doucement : 2 messages par seconde au plus."), $("#notice").textContent);
+    await until(() => $("#chat-input").value === "trois");
+    check("hôte trop rapide : texte gardé dans le champ", $("#chat-input").value === "trois");
+    $("#chat-input").value = "";
     check("pas de boutons d'exclusion au survol", !$("#room-players .mod") && !$$("#room-players button").some((b) => /✕|🚫/.test(b.textContent)));
 
     // --- Bannir : nom → fiche → « Bannir… » → panneau qui écrit les conséquences ---
@@ -119,7 +133,13 @@ const { read, until, check, done, makeEngine, sidebarFor, playlist } = require("
     await until(() => !Object.keys(carol.snap().settings.blocked).length);
     check("Débloquer", cb.$("#blocked li").textContent === "Personne n'est bloqué.");
     cb.click("#close-settings");
+    carol.act("guestChat", "au revoir", false);
+    await until(() => $$("#chat .msg").some((p) => p.textContent.includes("au revoir")));
     carol.act("leaveRoom");
+    await until(() => !host.snap().room.players.some((p) => p.name === "Carol"), 3000);
+    await until(() => !$$("#chat .msg").find((p) => p.textContent.includes("au revoir"))?.querySelector(".who").classList.contains("me"));
+    const goneLine = $$("#chat .msg").find((p) => p.textContent.includes("au revoir"));
+    check("joueur parti : nom ni surligné ni cliquable", goneLine && !goneLine.querySelector(".who").classList.contains("me"));
 
     // --- Réglages : envoyés au moteur et nettoyés ---
     sb.click("#open-settings");

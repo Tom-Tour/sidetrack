@@ -34,6 +34,8 @@ const { read, until, check, done, makeEngine, joinPage, playlist, FakeWorker } =
     host.act("hostChat", "bienvenue Alice");
     await until(() => alice.chat().some((t) => t.includes("bienvenue Alice")));
     const hostLine = [...alice.$("#chat").children].find((p) => p.textContent.includes("bienvenue Alice"));
+    check("chat : heure HH:MM en tête de ligne", hostLine.firstChild.nodeName === "TIME" && /^\d{1,2}:\d{2}/.test(hostLine.firstChild.textContent), hostLine.firstChild.textContent);
+    check("join.css : heure discrète, comme le kit", /#chat time \{[^}]*var\(--muted\)/.test(read("join/join.css")));
     check("message de l'hôte : « Hôte · CODE » en infobulle", hostLine.querySelector("b").title === `Hôte · ${host.snap().me.code}`);
     for (let i = 0; i < 4; i++) alice.say(`vite ${i}`);
     await until(() => !alice.$("#chat-note").hidden);

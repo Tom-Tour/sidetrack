@@ -221,6 +221,7 @@ function cleanMsg(m) {
     code: cleanText(m.code, 4),
     color: m.color ? cleanColor(m.color) : undefined,
     text: m.text == null ? undefined : cleanText(m.text),
+    at: Number.isFinite(m.at) ? m.at : undefined, // heure d'envoi chez l'hôte (ms)
   };
 }
 
@@ -421,24 +422,35 @@ function renderChat() {
   const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
   box.replaceChildren(
     ...chat.map((msg) => {
-      // Messages système : clés traduites ici, dans la langue de l'invité
-      if (msg.system) return el("p", { textContent: msg.key ? t(msg.key, ...(Array.isArray(msg.args) ? msg.args : [])) : "", className: "system" });
-      const who = msg.from === "host" ? t("host") : msg.name;
-      if (msg.masked) {
-        return msg.mine ? el("p", { textContent: t("yourGuess", msg.mine), className: "masked" }) : el("p", { textContent: t("someoneGuessed", who), className: "masked" });
-      }
-      const p = el("p");
-      const name = p.appendChild(el("b", { textContent: `${who} : ` }));
-      name.title = label(who, msg.code);
-      if (msg.color) name.style.color = msg.color;
-      p.append(msg.text ?? "");
-      if (msg.ref) {
-        p.append(el("span", { textContent: `▶ ${cleanText(msg.ref.label, 120) || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, className: "pill ref" }));
+      const p = chatLine(msg);
+      // Heure d'envoi (HH:MM), donnée par l'hôte, comme dans la barre latérale
+      if (Number.isFinite(msg.at)) {
+        const date = new Date(msg.at);
+        p.prepend(el("time", { textContent: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), dateTime: date.toISOString() }));
       }
       return p;
     })
   );
   if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+// Contenu d'une ligne (sans l'heure)
+function chatLine(msg) {
+  // Messages système : clés traduites ici, dans la langue de l'invité
+  if (msg.system) return el("p", { textContent: msg.key ? t(msg.key, ...(Array.isArray(msg.args) ? msg.args : [])) : "", className: "system" });
+  const who = msg.from === "host" ? t("host") : msg.name;
+  if (msg.masked) {
+    return msg.mine ? el("p", { textContent: t("yourGuess", msg.mine), className: "masked" }) : el("p", { textContent: t("someoneGuessed", who), className: "masked" });
+  }
+  const p = el("p");
+  const name = p.appendChild(el("b", { textContent: `${who} : ` }));
+  name.title = label(who, msg.code);
+  if (msg.color) name.style.color = msg.color;
+  p.append(msg.text ?? "");
+  if (msg.ref) {
+    p.append(el("span", { textContent: `▶ ${cleanText(msg.ref.label, 120) || t("video")}${msg.ref.start ? ` (${formatTime(msg.ref.start)})` : ""}`, className: "pill ref" }));
+  }
+  return p;
 }
 
 // --- Affichage ---------------------------------------------------------------

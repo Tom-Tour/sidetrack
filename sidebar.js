@@ -242,7 +242,8 @@ $("#chat-form").addEventListener("submit", async (e) => {
   $("#chat-input").value = "";
   if (view.guest) return act("guestChat", text, secretGuess);
   const error = await ask("hostChat", text, secretGuess);
-  if (error) $("#chat-input").value = text; // trop rapide : le texte n'est pas perdu
+  // Trop rapide : le moteur affiche le bandeau errTooFast, et le texte n'est pas perdu
+  if (error) $("#chat-input").value = text;
 });
 
 // --- Contrôles ---------------------------------------------------------------
@@ -424,9 +425,24 @@ function renderPerson(blind) {
   box.replaceChildren(...personCard(known, { onClose: closePerson, actions }));
 }
 
-// Ligne de chat. Hôte : timecodes et vidéos proposées cliquables (pour tout le salon),
+// Heure d'envoi (HH:MM), donnée par l'hôte : la même pour tout le salon
+function chatTime(msg) {
+  if (!Number.isFinite(msg.at)) return null;
+  const date = new Date(msg.at);
+  return el("time", { textContent: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), dateTime: date.toISOString() });
+}
+
+// Ligne de chat, précédée de son heure (GUIDE §3)
+function chatLine(msg, options) {
+  const p = chatBody(msg, options);
+  const time = chatTime(msg);
+  if (time) p.prepend(time);
+  return p;
+}
+
+// Contenu d'une ligne. Hôte : timecodes et vidéos proposées cliquables (pour tout le salon),
 // indice « probable », +1, nom cliquable (fiche). Invité : propositions masquées pendant une manche.
-function chatLine(msg, { guest, referee, playing }) {
+function chatBody(msg, { guest, referee, playing }) {
   if (msg.system) return el("p", { textContent: t(msg.key, ...(msg.args ?? [])), className: "msg system" });
   const who = (m) => (m.from === "host" ? t("host") : m.name);
   if (msg.masked) return el("p", { textContent: msg.mine ? t("yourGuess", msg.mine) : t("someoneGuessed", who(msg)), className: "msg masked" });
@@ -440,7 +456,9 @@ function chatLine(msg, { guest, referee, playing }) {
   const clickable = guest
     ? msg.from !== view.guest.me && (msg.from === "host" || view.guest.players.some((x) => x.id === msg.from))
     : msg.from !== "host" && view.room?.players.some((x) => x.id === msg.from);
-  const name = p.appendChild(el("span", { textContent: `${who(msg)} : `, className: clickable ? "who" : "who me" }));
+  // Surligné : seulement son propre pseudo (pas celui d'un joueur parti, non cliquable lui aussi)
+  const mine = guest ? msg.from === view.guest.me : msg.from === "host";
+  const name = p.appendChild(el("span", { textContent: `${who(msg)} : `, className: mine ? "who me" : "who" }));
   name.title = nameWithCode(who(msg), msg.code);
   if (msg.color) name.style.color = msg.color;
   if (clickable) name.addEventListener("click", () => openPerson(msg.from));

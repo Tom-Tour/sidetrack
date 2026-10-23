@@ -346,7 +346,8 @@ function joinPage(code, language = "fr-FR", storage = {}) {
       $("#chat-input").value = text;
       $("#chat-form").dispatchEvent(new win.Event("submit", { cancelable: true }));
     },
-    chat: () => [...$("#chat").children].map((p) => p.textContent),
+    // Texte des lignes sans l'heure (<time>), qui dépend de l'instant
+    chat: () => [...$("#chat").children].map((p) => [...p.childNodes].filter((n) => n.nodeName !== "TIME").map((n) => n.textContent).join("")),
   };
 }
 

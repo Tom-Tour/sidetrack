@@ -550,7 +550,13 @@ function systemMessage(key, ...args) {
 
 // Le nom « Hôte » est traduit à l'affichage (from === "host")
 function hostChat(text, ref = null, secret = true) {
-  if (!room || !rateOk(hostTimes, LIMITS.SEND_PER_SECOND)) return "errTooFast";
+  if (!room) return "errTooFast";
+  // Trop rapide : même bandeau que chez un invité, sinon l'hôte ne sait pas pourquoi rien ne part
+  if (!rateOk(hostTimes, LIMITS.SEND_PER_SECOND)) {
+    notice = { key: "errTooFast", args: [LIMITS.SEND_PER_SECOND] };
+    update();
+    return "errTooFast";
+  }
   addChat({ from: "host", code: identity.code, name: "", text: cleanText(text), ref, secret: secret !== false });
 }
 

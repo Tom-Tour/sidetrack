@@ -62,6 +62,7 @@ header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin:
 }
 #chat p { margin: 3px 0; overflow-wrap: anywhere; }
 #chat .system { color: var(--muted); font-style: italic; }
+#chat time { color: var(--muted); font-size: 12px; margin-right: 4px; font-variant-numeric: tabular-nums; } /* comme .chat time du kit */
 #chat .masked { color: var(--muted); }
 #chat .ref { color: var(--accent); border-color: var(--accent); margin-left: 4px; white-space: nowrap; }
 #chat-form { display: flex; gap: 6px; }
