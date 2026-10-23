@@ -99,7 +99,10 @@ async function answerChallenge(g, msg) {
     return connectGuest(g);
   }
   const tags = [["room", String(msg.room)], ["challenge", String(msg.c)], ["pow", String(identity.pow)]];
-  safeSend(g.conn, { t: "hello", name: settings.nickname || t("defaultName"), ev: signHello(identity.secret, tags) });
+  // Notre propre défi : l'hôte devra le signer pour prouver qui il est (voir « welcome »)
+  g.helloRoom = String(msg.room);
+  g.guestChallenge = hex(crypto.getRandomValues(new Uint8Array(16)));
+  safeSend(g.conn, { t: "hello", name: settings.nickname || t("defaultName"), ev: signHello(identity.secret, tags), gc: g.guestChallenge });
 }
 
 // Fin de notre présence (salon fermé, exclusion, connexion perdue) : le panneau garde la raison
@@ -131,7 +134,7 @@ function leaveRoom() {
 // Ce que l'hôte nous dit des autres est revérifié ici aussi (formes, longueurs, couleurs)
 function cleanPlayer(p) {
   return {
-    id: typeof p?.id === "string" ? p.id.slice(0, 64) : "",
+    id: typeof p?.id === "string" && /^[0-9a-f]{64}$/.test(p.id) ? p.id : "", // une identité, ou rien
     code: cleanText(p?.code, 4),
     name: cleanName(p?.name),
     color: cleanColor(p?.color),
@@ -154,12 +157,30 @@ function onHostData(g, msg) {
   if (!msg || typeof msg !== "object") return;
   g.heard = Date.now(); // toute donnée reçue compte comme signe de vie
   switch (msg.t) {
-    case "welcome":
-      g.hostId = typeof msg.hostId === "string" && /^[0-9a-f]{64}$/.test(msg.hostId) ? msg.hostId : "";
-      if (settings.blocked[g.hostId]) {
+    case "welcome": {
+      // L'hôte prouve son identité : notre défi signé par lui, pour ce salon, avec sa preuve de
+      // travail. Sans cela, un hôte bloqué pourrait entrer sous une autre identité annoncée.
+      const hostId = verifyHello(msg.hostEv, { room: g.helloRoom, challenge: g.guestChallenge, role: "host" });
+      const nonce = Number(msg.hostEv?.tags?.find((x) => Array.isArray(x) && x[0] === "pow")?.[1]);
+      if (!hostId || !Number.isSafeInteger(nonce) || nonce < 0) {
+        safeSend(g.conn, { t: "bye" });
+        return endGuest(g, "errHostUnverified");
+      }
+      if (settings.blocked[hostId]) {
         safeSend(g.conn, { t: "bye" });
         return endGuest(g, "errHostBlocked");
       }
+      g.hostId = hostId;
+      g.hostCode = "";
+      pow.check(hostId, nonce).then(({ bits, code }) => {
+        if (guest !== g || g.status === "ended") return;
+        if (bits < POW.BITS) {
+          safeSend(g.conn, { t: "bye" });
+          return endGuest(g, "errHostUnverified");
+        }
+        g.hostCode = code; // le code affiché pour l'hôte est celui de sa preuve, pas celui qu'il annonce
+        update();
+      });
       g.status = "joined";
       g.me = msg.you;
       g.chat = (Array.isArray(msg.chat) ? msg.chat : []).map(cleanGuestChat).filter(Boolean);
@@ -172,6 +193,7 @@ function onHostData(g, msg) {
       }, HEARTBEAT.EVERY);
       safeSend(g.conn, { t: "ping", at: performance.now() });
       break;
+    }
     case "state":
       g.host = msg;
       g.players = (Array.isArray(msg.players) ? msg.players : []).map(cleanPlayer);
@@ -237,13 +259,13 @@ function guestBlock(id) {
   if (g?.status !== "joined") return;
   if (id === "host") {
     if (!g.hostId) return;
-    settings.blocked[g.hostId] = `${t("host")} · ${cleanText(g.host?.hostCode, 4)}`;
+    settings.blocked[g.hostId] = `${t("host")} · ${g.hostCode}`;
     save();
     safeSend(g.conn, { t: "bye" });
     return endGuest(g, "errHostBlocked");
   }
   const p = g.players.find((x) => x.id === id);
-  if (!p || id === g.me) return;
+  if (!p || !p.id || id === g.me) return;
   settings.blocked[id] = `${p.name} · ${p.code}`;
   save();
   reportBlocks(g);
@@ -355,7 +377,7 @@ function guestSnapshot() {
     players: g.players.filter((p) => !settings.blocked[p.id]),
     chat: g.chat.filter((m) => !settings.blocked[m.from]),
     host: g.host,
-    hostCode: cleanText(g.host?.hostCode, 4),
+    hostCode: g.hostCode,
     videoId: g.sync?.id ?? null,
   };
 }

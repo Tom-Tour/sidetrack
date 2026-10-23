@@ -168,6 +168,7 @@ const STRINGS = {
     errKicked: "Exclu du salon par l'hôte",
     errBanned: "Banni des salons de cet hôte",
     errHostBlocked: "L'hôte de ce salon est bloqué",
+    errHostUnverified: "L'hôte de ce salon n'a pas prouvé son identité (sa version de Sidetrack n'est peut-être pas à jour)",
 
     // Bandeau
     noticeExportEmpty: "Playlist vide : rien à exporter.",
@@ -388,6 +389,7 @@ const STRINGS = {
     errKicked: "The host kicked you from the room",
     errBanned: "The host banned you from their rooms",
     errHostBlocked: "You blocked the host of this room",
+    errHostUnverified: "The host of this room did not prove their identity (their Sidetrack may be out of date)",
 
     noticeExportEmpty: "Empty playlist: nothing to export.",
     noticeExported:

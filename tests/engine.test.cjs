@@ -225,6 +225,20 @@ const { until, check, done, makeEngine, playlist, FakeWorker } = require("./harn
     await until(() => eve.snap().guest?.status === "ended", 5000);
     check("et ne peut plus y revenir", eve.snap().guest.endKey === "errHostBlocked");
     eve.act("leaveRoom");
+    // L'hôte annonce une autre identité : c'est sa signature qui compte, Eve reste dehors
+    host.eval("var __send = safeSend; safeSend = (c, m) => __send(c, m && m.t === 'welcome' ? { ...m, hostId: 'b'.repeat(64) } : m)");
+    eve.act("joinRoom", "blocage");
+    await until(() => eve.snap().guest?.status === "ended", 5000);
+    check("hôte bloqué sous une autre identité annoncée : toujours refusé", eve.snap().guest.endKey === "errHostBlocked");
+    eve.act("leaveRoom");
+    // Hôte sans preuve (ancienne version, ou hôte qui ment) : refusé
+    host.eval("safeSend = (c, m) => __send(c, m && m.t === 'welcome' ? { ...m, hostEv: undefined } : m)");
+    finn.act("leaveRoom");
+    finn.act("joinRoom", "blocage");
+    await until(() => finn.snap().guest?.status === "ended", 5000);
+    check("hôte qui ne prouve pas son identité : refusé", finn.snap().guest?.endKey === "errHostUnverified", JSON.stringify(finn.snap().guest?.endKey));
+    host.eval("safeSend = __send");
+    finn.act("leaveRoom");
 
     // Une personne bloquée n'entre pas dans nos salons
     host.act("closeRoom");

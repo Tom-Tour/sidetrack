@@ -221,6 +221,8 @@ function onConnData(conn, msg) {
     const nonce = Number(msg.ev.tags.find((x) => x[0] === "pow")?.[1]);
     if (!Number.isSafeInteger(nonce) || nonce < 0) return conn.close();
     entry.checking = true;
+    // Défi de l'invité : l'hôte le signera à son tour dans « welcome » (l'invité vérifie qui l'accueille)
+    entry.guestChallenge = typeof msg.gc === "string" && /^[0-9a-f]{32}$/.test(msg.gc) ? msg.gc : null;
     pow.check(id, nonce).then(({ bits, code }) => {
       if (bits < POW.BITS) return conn.close();
       if (room?.pending.get(conn) === entry && conn.open) admit(conn, entry, id, code, msg.name);
@@ -272,7 +274,11 @@ function admit(conn, entry, id, code, rawName) {
   };
   room.players.set(id, player);
   const chat = room.chat.filter((m) => !apart(id, m.from)).map(publicChat);
-  safeSend(conn, { t: "welcome", code: room.code, you: id, myCode: code, name: player.name, hostId: identity.pubkey, chat });
+  // Preuve de l'hôte : notre identité signe le défi de l'invité, pour ce salon, avec notre preuve de travail
+  const hostEv = entry.guestChallenge
+    ? signHello(identity.secret, [["room", room.code], ["challenge", entry.guestChallenge], ["role", "host"], ["pow", String(identity.pow)]])
+    : undefined;
+  safeSend(conn, { t: "welcome", code: room.code, you: id, myCode: code, name: player.name, hostId: identity.pubkey, hostEv, chat });
   safeSend(conn, stateFor(player, publicState()));
   if (lastSync) safeSend(conn, lastSync);
   if (!old) systemMessage("sysJoined", player.name);
